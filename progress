@@ -156,15 +156,15 @@ KLIENT:
 [] umożliwia pobranie listy plików obecnie przechowywanych w grupie węzłów serwerowych.
 
 
-KOMUNIKATY:
+[] KOMUNIKATY:
 
-SIMPL_CMD {
+[X] SIMPL_CMD {
 char[10] cmd    (2)
 uint64 cmd_seq  (1)
 char[] data
 }
 
-CMPLX_CMD {
+[X] CMPLX_CMD {
 char[10] cmd    (2)
 uint64 cmd_seq  (1)
 uint64 param    (1)
