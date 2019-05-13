@@ -1,4 +1,4 @@
-#include "client.hpp"
+#include "client/client.hpp"
 // #include <boost/program_options.hpp>
 #include <iostream>
 #include <string> // jest w iostream, ale to jest shady~
@@ -44,6 +44,6 @@ int main(int argc, const char *argv[]) {
     // }
 
     sik2::client::client c = sik2::client::client();
-    c.recoginse_request();
+    c.run();
 
 }
