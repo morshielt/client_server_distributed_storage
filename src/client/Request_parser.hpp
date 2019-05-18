@@ -1,3 +1,5 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "MemberFunctionCanBeStaticInspection"
 #ifndef REQUEST_PARSER_HPP
 #define REQUEST_PARSER_HPP
 
@@ -7,7 +9,7 @@
 
 namespace cmmn = sik_2::common;
 
-namespace sik_2::client {
+namespace sik_2::request_parser {
     namespace {
         const std::string DISCOVER{"[Dd][Ii][Ss][Cc][Oo][Vv][Ee][Rr]"};
         const std::string SEARCH{"[Ss][Ee][Aa][Rr][Cc][Hh]"};
@@ -20,6 +22,8 @@ namespace sik_2::client {
         const std::string OPTIONS{DISCOVER + "|" + SEARCH + "|" + FETCH + "|" + UPLOAD + "|" + REMOVE + "|" + EXIT};
     }
 
+    enum class Request { search, discover, fetch, upload, remove, exit, unknown };
+
     class Request_parser {
     private:
         const std::string REQUEST{"^\\s*(" + OPTIONS + ")" + ANY_END};
@@ -27,7 +31,9 @@ namespace sik_2::client {
         static const size_t REQ{1};
         static const size_t PARAM{2};
 
-        void match_request(const std::string &line) {
+        // std::string param;
+
+        Request match_request(const std::string &line, std::string &param) {
             try {
                 std::regex re(REQUEST);
                 std::cmatch cm;    // same as std::match_results<const char*> cm;
@@ -44,7 +50,8 @@ namespace sik_2::client {
                     std::cout << "\n";
                 }
 
-                recognise_request(cm[REQ], cm[PARAM]);
+                param = cm[PARAM];
+                return recognise_request(cm[REQ], cm[PARAM]);
 
             } catch (std::regex_error &e) {
                 // syntax error in regex
@@ -52,52 +59,39 @@ namespace sik_2::client {
             }
         }
 
-        void recognise_request(std::string req, std::string param) { // validate?
-            // TODO walidacja parametrów
-            // TODO enum zwracać i parametr przez & ?
-            // if (req[0] == 'd' || req[0] == 'D') {
-            //     if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
-            // } else if (req[0] == 'e' || req[0] == 'E') {
-            //     if (cmmn::DEBUG) std::cout << "EXIT" << "\n";
-            // } else if ((req[0] == 's' || req[0] == 'S')) {
-            //     if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
-            // } else if ((req[0] == 'f' || req[0] == 'F')) {
-            //     if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
-            // } else if ((req[0] == 's' || req[0] == 'S')) {
-            //     if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
-            // } else if (cmmn::DEBUG) {
-            //     std::cout << "UNKNOWN : " << req << "\n";
-            // }
-
+        Request recognise_request(std::string req, std::string param) { // validate?
             switch (req[0]) {
                 case 'D':
                 case 'd': {
-                    if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
+                    // if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
+                    if (param.empty()) return Request::discover;
                     break;
                 }
                 case 'S':
                 case 's': {
-                    if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
+                    // if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
                     break;
                 }
                 case 'F':
                 case 'f': {
-                    if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
+                    if (param.empty()) return Request::discover;
+
+                    // if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
                     break;
                 }
                 case 'U':
                 case 'u': {
-                    if (cmmn::DEBUG) std::cout << "UPLOAD" << "\n";
+                    // if (cmmn::DEBUG) std::cout << "UPLOAD" << "\n";
                     break;
                 }
                 case 'R':
                 case 'r': {
-                    if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
+                    // if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
                     break;
                 }
                 case 'E':
                 case 'e': {
-                    if (cmmn::DEBUG) std::cout << "EXIT" << "\n";
+                    // if (cmmn::DEBUG) std::cout << "EXIT" << "\n";
                     break;
                 }
                 default: {
@@ -107,13 +101,12 @@ namespace sik_2::client {
         }
 
     public:
-
-        void next_request() {
+        Request next_request(std::string &param) {
             std::string line;
 
             std::cout << "\nPlease enter request:\n";
             getline(std::cin, line);
-            match_request(line);
+            return match_request(line, param);
         }
     };
 }

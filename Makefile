@@ -4,7 +4,7 @@ BOOST = -lboost_program_options -lboost_system -lboost_filesystem
 
 all: netstore-server netstore-client
 
-netstore-server: src/server.cpp
+netstore-server: src/Server.cpp
 	$(CXX) $(FLAGS) $< $(BOOST) -o $@
 
 netstore-client: src/Client.cpp

@@ -14,5 +14,5 @@ set(Boost_USE_STATIC_LIBS ON)
 add_executable(netstore-client src/Client.cpp)
 target_link_libraries(netstore-client ${Boost_LIBRARIES})
 
-add_executable(netstore-server src/server.cpp )
+add_executable(netstore-server src/Server.cpp)
 target_link_libraries(netstore-server ${Boost_LIBRARIES})

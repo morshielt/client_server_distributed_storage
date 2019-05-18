@@ -44,11 +44,23 @@ int main(int argc, const char *argv[]) {
     }
 
     try {
-        sik_2::client::Client c = sik_2::client::Client(mcast_addr, cmd_port, out_fldr, timeout);
+        sik_2::client::Client c{mcast_addr, cmd_port, out_fldr, timeout};
         c.run();
 
     } catch (std::exception &e) {
         std::cerr << "ERROR: " << e.what() << "\n";
         exit(1);
     }
+
+
+    // std::string str{cmmn::hello_, 10};
+    // std::cout << "|" + str << "|" << "\n";
+    //
+    // size_t n = 100;
+    // std::string msg(n, '-');
+    // std::cout << msg << "\n";
+    //
+    // std::cout << std::string(n, '-') << "\n";
+
+
 }

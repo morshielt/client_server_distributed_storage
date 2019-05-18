@@ -1,6 +1,6 @@
-#include "server/server.hpp"
+#include "server/Server.hpp"
 
-#include "client/Client.hpp"
+#include "server/Server.hpp"
 #include <boost/program_options.hpp>
 
 #include <iostream>
@@ -28,7 +28,7 @@ int main(int argc, const char *argv[]) {
         opt_desc.add_options()
             ("help,h", "produce help message")
             (",g", opt::value<std::string>(&mcast_addr)->required(), "mcast_addr")
-            (",p", opt::value<int32_t >(&cmd_port)->required(), "cmd_port")
+            (",p", opt::value<int32_t>(&cmd_port)->required(), "cmd_port")
             (",f", opt::value<std::string>(&shdr_fldr)->required(), "shdr_fldr")
             (",t", opt::value<int32_t>(&timeout)->default_value(cmmn::DEF_TIMEOUT), "timeout");
 
@@ -51,7 +51,8 @@ int main(int argc, const char *argv[]) {
     }
 
     try {
-
+        sik_2::server::Server s{mcast_addr, cmd_port, shdr_fldr, timeout};
+        s.run();
     } catch (std::exception &e) {
         std::cerr << "ERROR: " << e.what() << "\n";
         exit(1);
