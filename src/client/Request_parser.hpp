@@ -20,7 +20,7 @@ namespace sik_2::client {
         const std::string OPTIONS{DISCOVER + "|" + SEARCH + "|" + FETCH + "|" + UPLOAD + "|" + REMOVE + "|" + EXIT};
     }
 
-    class request_parser {
+    class Request_parser {
     private:
         const std::string REQUEST{"^\\s*(" + OPTIONS + ")" + ANY_END};
         // indexes in cmatch
@@ -47,7 +47,7 @@ namespace sik_2::client {
                 recognise_request(cm[REQ], cm[PARAM]);
 
             } catch (std::regex_error &e) {
-                // Syntax error in the regular expression
+                // syntax error in regex
                 throw e;
             }
         }

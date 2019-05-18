@@ -171,8 +171,11 @@ uint64 param    (1)
 char[] data
 }
 
+[?][muszę rzutawać czy przy przekazaniu się zrzutuje? D:]
 (1) w BE(sieciowa kolejność); dla zmiennej o < 64 bity zrzutować (uint64) i użyć htobe64();
+
 (2) krótsza wartość niż 10 znaków => uzupełnić zerami~ (zrobić wcześniej memset? przechowywać uzupełnione z zerami?)
+// uh oh, memset to chyba nie, bo utnie, chcemy prawdziwe zera?
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
