@@ -18,7 +18,7 @@ namespace sik_2::request_parser {
         const std::string REMOVE{"[Rr][Ee][Mm][Oo][Vv][Ee]|r"};
         const std::string EXIT{"[Ee][Xx][Ii][Tt]|e"};
 
-        const std::string ANY_END{"(?:\\s*((?:\\s*(?:\\w|\\/))*))\\s*$"};
+        const std::string ANY_END{"(?:\\s*((?:\\s*(?:.*))*))\\s*$"};
         const std::string OPTIONS{DISCOVER + "|" + SEARCH + "|" + FETCH + "|" + UPLOAD + "|" + REMOVE + "|" + EXIT};
     }
 

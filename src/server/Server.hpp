@@ -47,7 +47,7 @@ namespace sik_2::server {
 
         void get_request() {
             struct sockaddr_storage sender{};
-            ssize_t rcv_len{};
+            uint64_t rcv_len{};
 
             sckt::socket_UDP s{mcast_addr, cmd_port, timeout};
             sckt::socket_UDP s2{mcast_addr, cmd_port, timeout};
@@ -55,6 +55,29 @@ namespace sik_2::server {
             char buffer[cmmn::MAX_UDP_PACKET_SIZE];
 
             while (true) {
+                // GOOD DAY
+                /*socklen_t sendsize = sizeof(sender);
+                memset(&sender, 0, sizeof(sender));
+
+                rcv_len = recvfrom(s.get_sock(), buffer, sizeof(buffer), 0, (struct sockaddr *) &sender, &sendsize);
+
+                if (rcv_len < 0) {
+                    throw std::system_error(EFAULT, std::generic_category());
+                    // syserr("read");
+                } else {
+                    cmmn::print_bytes(rcv_len, buffer);
+                }
+
+                cmds::Simpl_cmd cmd{buffer, rcv_len};
+                std::cout << "\"" << cmd.get_cmd() << "\" \"" << cmd.get_cmd_seq() << "\" \"" << cmd.get_data() << "\"\n";
+
+                cmds::Cmplx_cmd x{cmmn::good_day_, 666, f_manager.get_free_space(), mcast_addr.c_str()};
+
+                // odsyłamy czas tam, skąd dostaliśmy requesta
+                sendto(s.get_sock(), x.raw_msg(), x.msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
+                std::cout << "sent answer\n";*/
+
+
                 socklen_t sendsize = sizeof(sender);
                 memset(&sender, 0, sizeof(sender));
 
@@ -62,16 +85,21 @@ namespace sik_2::server {
 
                 if (rcv_len < 0) {
                     throw std::system_error(EFAULT, std::generic_category());
-                    //syserr("read");
+                    // syserr("read");
                 } else {
                     cmmn::print_bytes(rcv_len, buffer);
                 }
 
-                cmds::Cmplx_cmd x{cmmn::good_day_, 666, f_manager.get_free_space(), mcast_addr.c_str()};
+
+                sckt::socket_TCP_in tcp_sock{timeout};
+
+                // "accepting client connections on port 0"
+                cmds::Cmplx_cmd x{cmmn::good_day_, 666, tcp_sock.get_port(), ""};
 
                 // odsyłamy czas tam, skąd dostaliśmy requesta
                 sendto(s.get_sock(), x.raw_msg(), x.msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
                 std::cout << "sent answer\n";
+
             }
         }
 

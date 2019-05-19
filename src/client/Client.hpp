@@ -124,7 +124,7 @@ namespace sik_2::client {
             std::cout << "bytes_sent " << bytes_sent << "\n";
 
             // struct sockaddr sender{};
-            ssize_t rcv_len{};
+            uint64_t rcv_len{};
 
             char buffer[cmmn::MAX_UDP_PACKET_SIZE];
 
@@ -135,7 +135,7 @@ namespace sik_2::client {
                 socklen_t sendsize = sizeof(sender);
                 memset(&sender, 0, sizeof(sender));
                 rcv_len =
-                    recvfrom(sock.get_sock(), buffer, sizeof(buffer), 0, /*(struct sockaddr *) */&sender, &sendsize);
+                    recvfrom(sock.get_sock(), buffer, sizeof(buffer), 0, &sender, &sendsize);
 
                 if (rcv_len == -1) {
                     if (errno == EWOULDBLOCK || errno == EAGAIN) {
@@ -168,9 +168,10 @@ namespace sik_2::client {
                     return false;
                 }
 
-                std::cout << "Found " << get_sender_ip() << " (" << ans.get_data() << ") with free space "
-                          << ans.get_param() << "\n";
-                if (upload) {
+                if (!upload) {
+                    std::cout << "Found " << get_sender_ip() << " (" << ans.get_data() << ") with free space "
+                              << ans.get_param() << "\n";
+                } else {
                     servers.insert({ans.get_param(), get_sender_ip()});
                 }
                 return true;
@@ -195,33 +196,33 @@ namespace sik_2::client {
                 return;
             }
 
-            auto lambd = std::function([this](cmds::Cmplx_cmd ans)->bool {
-
-
-
-                std::cout << "OUOUOUOUO \"" << ans.get_cmd() << "\" \"" << cmmn::good_day_ << "\"\n";
-
-                // int compare(size_t pos, size_t len, const string &str) const;
-                std::cout << "TRU? " << ans.get_cmd().compare(/*0, cmmn::CMD_SIZE, */cmmn::can_add_) << "\n";
-                if (ans.get_cmd().compare(/*0, cmmn::CMD_SIZE, */cmmn::good_day_) != 0) {
-                    return false;
-                }
-
-                std::cout << "Found " << get_sender_ip() << " (" << ans.get_data() << ") with free space "
-                          << ans.get_param() << "\n";
-                // if (upload) {
-                //     servers.insert({ans.get_param(), get_sender_ip()});
-                // }
-                return true;
-            });
-            //
-            // send_and_recv(cmds::Cmplx_cmd{cmmn::add_, 666, fs::file_size(out_fldr + filename), filename},
-            //               cmmn::good_day_, 666, lambd);
-
-            cmds::Cmplx_cmd x{cmmn::add_, 666, fs::file_size(out_fldr + filename), filename};
-
+            bool accept = false;
             for (auto &ser : servers) {
 
+                auto lambd = std::function([this, &accept, filename](cmds::Cmplx_cmd ans)->bool {
+
+                    std::cout << "CAN ADD? " << ans.get_cmd().compare(cmmn::can_add_) << "\n";
+                    std::cout << "NO WAY? " << ans.get_cmd().compare(cmmn::no_way_) << "\n";
+
+                    if (ans.get_cmd().compare(cmmn::no_way_) == 0) {
+                        return (ans.get_data().compare(filename) == 0);
+
+                    } else if (ans.get_cmd().compare(cmmn::can_add_)) {
+                        accept = true;
+                        //TODO tcp
+                        return true;
+
+                    } else {
+                        return false;
+                    }
+                });
+
+                if (!accept) {
+                    send_and_recv(cmds::Cmplx_cmd{cmmn::add_, 666, fs::file_size(out_fldr + filename), filename}, ser
+                        .second, 666, lambd);
+                } else {
+                    break;
+                }
             }
         }
 
