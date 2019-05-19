@@ -78,20 +78,14 @@ namespace sik_2::sockets {
             gettimeofday(&curr, nullptr);
 
             struct timeval diff;
-            diff.tv_sec = curr.tv_sec - start.tv_sec;
-            diff.tv_usec = curr.tv_usec - start.tv_usec;
+
+            diff.tv_sec = timeout + start.tv_sec - curr.tv_sec;
+            diff.tv_usec = start.tv_usec - curr.tv_usec;
+
             if (diff.tv_usec < 0) {
                 diff.tv_sec--;
                 diff.tv_usec += 1000000;
             }
-
-            if (diff.tv_sec > timeout) {
-                return false;
-            }
-
-            // time left
-            diff.tv_sec = timeout - diff.tv_sec - 1;
-            diff.tv_usec = 1000000 - diff.tv_usec;
 
             std::cout << diff.tv_sec << " " << diff.tv_usec << "\n";
             setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *) &diff, sizeof diff);

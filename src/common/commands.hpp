@@ -40,13 +40,13 @@ namespace sik_2::commands {
 
         }
 
-        Simpl_cmd(char *whole, uint64_t data_offset) : data_offset{data_offset} {
-            msg = std::string{whole};
+        Simpl_cmd(char *whole, uint64_t size, uint64_t data_offset) : data_offset{data_offset} {
+            msg = std::string{whole, size};
         }
 
     public:
 
-        Simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data)
+        Simpl_cmd(const std::string &cmd, ssize_t cmd_seq, const std::string &data)
             : data_offset{cmmn::CMD_SIZE + sizeof(uint64_t)} {
 
             msg = std::string(data.size() + data_offset, 0);
@@ -88,16 +88,14 @@ namespace sik_2::commands {
 
     class Cmplx_cmd : public Simpl_cmd {
     public:
-        Cmplx_cmd(const std::string &cmd, uint64_t cmd_seq, uint64_t param, const std::string &data, uint64_t
-        data_offset)
+        Cmplx_cmd(const std::string &cmd, uint64_t cmd_seq, uint64_t param, const std::string &data)
             : Simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {
             // param
             uint64_t be_param = htobe64(param);
-            memcpy(msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t), &param, sizeof(uint64_t));
+            memcpy(msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t), &be_param, sizeof(uint64_t));
         }
 
-        Cmplx_cmd(char *whole) : Simpl_cmd(whole, 26) {
-            // msg = std::string{whole};
+        Cmplx_cmd(char *whole, ssize_t size) : Simpl_cmd(whole, size, 26) {
         }
 
         uint64_t get_param() {

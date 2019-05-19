@@ -15,11 +15,11 @@ namespace {
 }
 
 int main(int argc, const char *argv[]) {
-
     std::string mcast_addr;
     int32_t cmd_port;
     std::string shdr_fldr;
     int32_t timeout;
+    int64_t max_space;
 
     opt::options_description opt_desc("Options");
     opt::variables_map vm;
@@ -30,6 +30,7 @@ int main(int argc, const char *argv[]) {
             (",g", opt::value<std::string>(&mcast_addr)->required(), "mcast_addr")
             (",p", opt::value<int32_t>(&cmd_port)->required(), "cmd_port")
             (",f", opt::value<std::string>(&shdr_fldr)->required(), "shdr_fldr")
+            (",b", opt::value<int64_t>(&max_space)->default_value(cmmn::DEF_SPACE), "max_space")
             (",t", opt::value<int32_t>(&timeout)->default_value(cmmn::DEF_TIMEOUT), "timeout");
 
         opt::store(opt::parse_command_line(argc, argv, opt_desc), vm);
@@ -38,6 +39,7 @@ int main(int argc, const char *argv[]) {
         if (cmmn::DEBUG) std::cout << "mcast_addr " << mcast_addr << "\n";
         if (cmmn::DEBUG) std::cout << "cmd_port " << cmd_port << "\n";
         if (cmmn::DEBUG) std::cout << "shdr_fldr " << shdr_fldr << "\n";
+        if (cmmn::DEBUG) std::cout << "max_space " << max_space << "\n";
         if (cmmn::DEBUG) std::cout << "timeout " << timeout << "\n";
 
     } catch (const std::exception &e) {
@@ -51,7 +53,7 @@ int main(int argc, const char *argv[]) {
     }
 
     try {
-        sik_2::server::Server s{mcast_addr, cmd_port, shdr_fldr, timeout};
+        sik_2::server::Server s{mcast_addr, cmd_port, shdr_fldr, max_space, timeout};
         s.run();
     } catch (std::exception &e) {
         std::cerr << "ERROR: " << e.what() << "\n";

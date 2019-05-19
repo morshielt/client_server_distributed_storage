@@ -11,12 +11,12 @@ namespace cmmn = sik_2::common;
 
 namespace sik_2::request_parser {
     namespace {
-        const std::string DISCOVER{"[Dd][Ii][Ss][Cc][Oo][Vv][Ee][Rr]"};
-        const std::string SEARCH{"[Ss][Ee][Aa][Rr][Cc][Hh]"};
-        const std::string FETCH{"[Ff][Ee][Tt][Cc][Hh]"};
-        const std::string UPLOAD{"[Uu][Pp][Ll][Oo][Aa][Dd]"};
-        const std::string REMOVE{"[Rr][Ee][Mm][Oo][Vv][Ee]"};
-        const std::string EXIT{"[Ee][Xx][Ii][Tt]"};
+        const std::string DISCOVER{"[Dd][Ii][Ss][Cc][Oo][Vv][Ee][Rr]|d"};
+        const std::string SEARCH{"[Ss][Ee][Aa][Rr][Cc][Hh]|s"};
+        const std::string FETCH{"[Ff][Ee][Tt][Cc][Hh]|f"};
+        const std::string UPLOAD{"[Uu][Pp][Ll][Oo][Aa][Dd]|u"};
+        const std::string REMOVE{"[Rr][Ee][Mm][Oo][Vv][Ee]|r"};
+        const std::string EXIT{"[Ee][Xx][Ii][Tt]|e"};
 
         const std::string ANY_END{"(?:\\s*((?:\\s*(?:\\w|\\/))*))\\s*$"};
         const std::string OPTIONS{DISCOVER + "|" + SEARCH + "|" + FETCH + "|" + UPLOAD + "|" + REMOVE + "|" + EXIT};
@@ -63,39 +63,35 @@ namespace sik_2::request_parser {
             switch (req[0]) {
                 case 'D':
                 case 'd': {
-                    // if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
                     if (param.empty()) return Request::discover;
-                    break;
+                    return Request::unknown;
                 }
                 case 'S':
                 case 's': {
-                    // if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
-                    break;
+                    return Request::search;
                 }
                 case 'F':
                 case 'f': {
-                    if (param.empty()) return Request::discover;
-
-                    // if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
-                    break;
+                    if (!param.empty()) return Request::fetch;
+                    return Request::unknown;
                 }
                 case 'U':
                 case 'u': {
-                    // if (cmmn::DEBUG) std::cout << "UPLOAD" << "\n";
-                    break;
+                    if (!param.empty()) return Request::upload;
+                    return Request::unknown;
                 }
                 case 'R':
                 case 'r': {
-                    // if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
-                    break;
+                    if (!param.empty()) return Request::remove;
+                    return Request::unknown;
                 }
                 case 'E':
                 case 'e': {
-                    // if (cmmn::DEBUG) std::cout << "EXIT" << "\n";
-                    break;
+                    if (param.empty()) return Request::exit;
+                    return Request::unknown;
                 }
                 default: {
-                    std::cout << "UNKNOWN : " << req << "\n";
+                    return Request::unknown;
                 }
             }
         }
