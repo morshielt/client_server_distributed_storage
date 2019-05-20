@@ -3,7 +3,7 @@
 
 #include "../common/validation.hpp"
 #include <map>
-
+// TODO mutex?
 namespace valid = sik_2::validation;
 namespace fs =  boost::filesystem;
 namespace sik_2::file_manager {
@@ -48,11 +48,11 @@ namespace sik_2::file_manager {
         file_manager(int64_t max_space, const std::string &shrd_fldr)
             : max_space{max_space}, free_space{max_space}, shrd_fldr{shrd_fldr} {
             // if (!valid::valid_directory(shrd_fldr)) {
-            //     throw excpt::Invalid_param{"shrd_fldr = " + shrd_fldr};
+            //     throw excpt::Invalid_argument{"shrd_fldr = " + shrd_fldr};
             // }
 
             if (!valid::in_range_incl<int64_t>(max_space, 0, INT64_MAX)) {
-                throw excpt::Invalid_param{"max_space = " + std::to_string(max_space)};
+                throw excpt::Invalid_argument{"max_space = " + std::to_string(max_space)};
             }
 
             init();
@@ -61,6 +61,10 @@ namespace sik_2::file_manager {
         uint64_t get_free_space() {
             std::cout << "get_free_space : " << free_space << "\n";
             return free_space;
+        }
+
+        bool filename_nontaken(std::string name) {
+            return files.find(name) == files.end();
         }
     };
 

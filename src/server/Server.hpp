@@ -19,6 +19,7 @@ namespace cmds = sik_2::commands;
 namespace sik_2::server {
 
     class Server {
+
     private:
         std::string mcast_addr;
         int32_t cmd_port;
@@ -32,77 +33,143 @@ namespace sik_2::server {
                                       timeout{timeout}, f_manager{max_space, shrd_fldr} {
 
             if (!valid::valid_ip(mcast_addr)) {
-                throw excpt::Invalid_param{"mcast_addr = " + mcast_addr};
+                throw excpt::Invalid_argument{"mcast_addr = " + mcast_addr};
             }
 
             if (!valid::in_range_incl<int32_t>(cmd_port, 0, cmmn::MAX_PORT)) {
-                throw excpt::Invalid_param{"cmd_port = " + std::to_string(cmd_port)};
+                throw excpt::Invalid_argument{"cmd_port = " + std::to_string(cmd_port)};
             }
+
+            //TODO tu wywalać timeout czy mogę dopiero w sockecie?
         }
 
         void run() {
-            // while (true)
-            get_request();
+            while (true)
+                get_request();
         }
 
+    private:
         void get_request() {
-            struct sockaddr_storage sender{};
+            //TODO Serwer powinien podłączyć się do grupy rozgłaszania ukierunkowanego
+            // pod wskazanym adresem MCAST_ADDR. Serwer powinien nasłuchiwać na porcie
+            // CMD_PORT poleceń otrzymanych z sieci protokołem UDP {{także na swoim adresie
+            // unicast}}?? Serwer powinien reagować na pakiety UDP zgodnie z protokołem opisanym wcześniej.
+            struct sockaddr sender{};
+            socklen_t sendsize = sizeof(sender);
+            memset(&sender, 0, sizeof(sender));
             uint64_t rcv_len{};
-
-            sckt::socket_UDP s{mcast_addr, cmd_port, timeout};
-            sckt::socket_UDP s2{mcast_addr, cmd_port, timeout};
-
             char buffer[cmmn::MAX_UDP_PACKET_SIZE];
 
-            while (true) {
-                // GOOD DAY
-                /*socklen_t sendsize = sizeof(sender);
-                memset(&sender, 0, sizeof(sender));
+            sckt::socket_UDP s{mcast_addr, cmd_port, timeout};
 
-                rcv_len = recvfrom(s.get_sock(), buffer, sizeof(buffer), 0, (struct sockaddr *) &sender, &sendsize);
+            rcv_len = recvfrom(s.get_sock(), buffer, sizeof(buffer), 0, &sender, &sendsize);
+            s.set_sender(sender);
 
-                if (rcv_len < 0) {
-                    throw std::system_error(EFAULT, std::generic_category());
-                    // syserr("read");
-                } else {
-                    cmmn::print_bytes(rcv_len, buffer);
+            if (rcv_len < 0) {
+                // TODO EWOULDBLOCK/EAGAIN???
+                throw std::system_error(EFAULT, std::generic_category());
+                // syserr("read");
+            }
+
+            switch (recognise_request(buffer[0])) {
+                case cmmn::Request::discover: {
+                    if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
+                    cmds::Simpl_cmd cmd{buffer, rcv_len};
+                    cmd.print_bytes();
+
+                    if (cmd.get_data().empty() && cmd.get_cmd().compare(cmmn::hello_) == 0)
+                        ans_discover(s, cmd);
+                    else
+                        invalid_package(sender, cmd_port, "Unknown command.");
+
+                    break;
                 }
-
-                cmds::Simpl_cmd cmd{buffer, rcv_len};
-                std::cout << "\"" << cmd.get_cmd() << "\" \"" << cmd.get_cmd_seq() << "\" \"" << cmd.get_data() << "\"\n";
-
-                cmds::Cmplx_cmd x{cmmn::good_day_, 666, f_manager.get_free_space(), mcast_addr.c_str()};
-
-                // odsyłamy czas tam, skąd dostaliśmy requesta
-                sendto(s.get_sock(), x.raw_msg(), x.msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
-                std::cout << "sent answer\n";*/
-
-
-                socklen_t sendsize = sizeof(sender);
-                memset(&sender, 0, sizeof(sender));
-
-                rcv_len = recvfrom(s.get_sock(), buffer, sizeof(buffer), 0, (struct sockaddr *) &sender, &sendsize);
-
-                if (rcv_len < 0) {
-                    throw std::system_error(EFAULT, std::generic_category());
-                    // syserr("read");
-                } else {
-                    cmmn::print_bytes(rcv_len, buffer);
+                case cmmn::Request::search: {
+                    if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
+                    break;
                 }
+                case cmmn::Request::fetch: {
+                    if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
+                    break;
+                }
+                case cmmn::Request::upload: {
+                    if (cmmn::DEBUG) std::cout << "UPLOAD" << "\n";
+                    cmds::Cmplx_cmd cmd{buffer, rcv_len};
+                    cmd.print_bytes();
 
+                    if (cmd.get_cmd().compare(cmmn::add_) == 0)
+                        ans_upload(s, cmd);
+                    else
+                        invalid_package(sender, cmd_port, "Unknown command.");
 
-                sckt::socket_TCP_in tcp_sock{timeout};
-
-                // "accepting client connections on port 0"
-                cmds::Cmplx_cmd x{cmmn::good_day_, 666, tcp_sock.get_port(), ""};
-
-                // odsyłamy czas tam, skąd dostaliśmy requesta
-                sendto(s.get_sock(), x.raw_msg(), x.msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
-                std::cout << "sent answer\n";
-
+                    break;
+                }
+                case cmmn::Request::remove: {
+                    if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
+                    break;
+                }
+                default: {
+                    if (cmmn::DEBUG) std::cout << "UNKNOWN " << "\n";
+                    invalid_package(sender, cmd_port, "Unknown command.");
+                }
             }
         }
 
+        void invalid_package(struct sockaddr addr, int32_t port, const std::string &msg) {
+            std::cout << "[PCKG ERROR] Skipping invalid package from " << cmmn::get_ip(addr)
+                      << ":" << port << ". " + msg + "\n";
+        }
+
+        void ans_discover(sckt::socket_UDP &s, cmds::Simpl_cmd cmd) {
+
+            if (cmmn::DEBUG) cmd.print_bytes();
+
+            cmds::Cmplx_cmd x{cmmn::good_day_, cmd.get_cmd_seq(), f_manager.get_free_space(), mcast_addr.c_str()};
+            x.print_bytes();
+            // odsyłamy czas tam, skąd dostaliśmy cmmn::Requesta
+            struct sockaddr sender = s.get_sender();
+            sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, &sender, sizeof(sender));
+            std::cout << "sent answer\n";
+        }
+
+        void ans_upload(sckt::socket_UDP &s, cmds::Cmplx_cmd cmd) {
+
+            struct sockaddr sender = s.get_sender();
+            if (!cmd.get_data().empty() && cmd.get_data().find('/') == std::string::npos &&
+                cmd.get_param() < f_manager.get_free_space() && f_manager.filename_nontaken(cmd.get_data())) {
+
+                sckt::socket_TCP_in tcp_sock{timeout};
+                //TODO TCP
+                cmds::Cmplx_cmd x{cmmn::good_day_, cmd.get_cmd_seq(), tcp_sock.get_port(), ""};
+                sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
+            } else {
+                cmds::Simpl_cmd x{cmmn::no_way_, cmd.get_cmd_seq(), cmd.get_data()};
+                sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
+            }
+        }
+
+        cmmn::Request recognise_request(char x) {
+            switch (x) {
+                case 'H': { // hello
+                    return cmmn::Request::discover;
+                }
+                case 'L': { // list
+                    return cmmn::Request::search;
+                }
+                case 'G': { // get
+                    return cmmn::Request::fetch;
+                }
+                case 'A': { // add
+                    return cmmn::Request::upload;
+                }
+                case 'D': { // del
+                    return cmmn::Request::remove;
+                }
+                default: {
+                    return cmmn::Request::unknown;
+                }
+            }
+        }
     };
 }
 

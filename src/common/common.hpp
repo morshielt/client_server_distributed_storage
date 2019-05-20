@@ -31,21 +31,10 @@ namespace sik_2::common {
     const std::string no_way_{"NO_WAY\0\0\0\0", CMD_SIZE};
     const std::string can_add_{"CAN_ADD\0\0\0", CMD_SIZE};
 
-    void syserr(const std::string &msg, const int &line, const std::string &file) {
-        std::cerr << msg << " " << std::to_string(line) << " : " << file << "\n";
+    enum class Request { search, discover, fetch, upload, remove, exit, unknown };
+
+    std::string get_ip(struct sockaddr addr) {
+        return inet_ntoa(((struct sockaddr_in *) &addr)->sin_addr);
     }
-
-    void print_bytes(int size, const char *str) {
-
-        for (int j = 0; j < CMD_SIZE; ++j) {
-            printf("%c ", (const unsigned char) str[j]);
-        }
-
-        for (int i = CMD_SIZE; i < size; ++i) {
-            printf("%d ", (const unsigned char) str[i]);
-        }
-        printf("\n");
-    }
-
 }
 #endif //COMMON_HPP

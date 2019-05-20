@@ -5,6 +5,7 @@
 namespace sik_2::exceptions {
 
     class Excpt_with_msg : public std::exception {
+
     private:
         std::string msg;
 
@@ -16,10 +17,18 @@ namespace sik_2::exceptions {
         }
     };
 
-    class Invalid_param : public Excpt_with_msg {
+    class Invalid_argument : public Excpt_with_msg {
+
     public:
         // działa tylko z rvalue, jakby co usunąć &&
-        explicit Invalid_param(std::string &&msg) : Excpt_with_msg{"invalid parameter " + std::move(msg)} {}
+        explicit Invalid_argument(std::string &&msg) : Excpt_with_msg{"invalid argument " + std::move(msg)} {}
+    };
+
+    class Socket_excpt : public Excpt_with_msg {
+
+    public:
+        // działa tylko z rvalue, jakby co usunąć &&
+        explicit Socket_excpt(std::string &&msg) : Excpt_with_msg{"invalid argument " + std::move(msg)} {}
     };
 
 
