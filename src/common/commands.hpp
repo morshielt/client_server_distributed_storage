@@ -32,6 +32,7 @@ namespace sik_2::commands {
             // data
             msg.replace(data_offset, data.size(), data);
             std::cout << ">> 1 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
+            if (cmmn::DEBUG) print_bytes();
         }
 
         Simpl_cmd(char *whole, uint64_t size, uint64_t data_offset)
@@ -39,6 +40,7 @@ namespace sik_2::commands {
 
             msg = std::string{whole, size_};
             std::cout << ">> 2 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
+            if (cmmn::DEBUG) print_bytes();
         }
 
     public:

@@ -4,6 +4,8 @@
 #include "../common/validation.hpp"
 #include <map>
 // TODO mutex?
+// f_lock? idkkkkkkkkkkkkkkkkkkkkk
+
 namespace valid = sik_2::validation;
 namespace fs =  boost::filesystem;
 namespace sik_2::file_manager {

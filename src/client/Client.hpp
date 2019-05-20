@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <set>
+#include <fcntl.h>
+#include <sys/sendfile.h>
 #include "../common/common.hpp"
 #include "../common/commands.hpp"
 #include "../common/exceptions.hpp"
@@ -22,6 +24,8 @@ namespace cmds = sik_2::commands;
 namespace sckt = sik_2::sockets;
 namespace cmmn = sik_2::common;
 
+
+// TODO nowe sockety dla fetcha
 namespace sik_2::client {
 
     class Client {
@@ -143,9 +147,9 @@ namespace sik_2::client {
 
                 // check cmd & cmd_seq
                 Recv_type y{buffer, static_cast<uint64_t>(ret)};
-                if (cmmn::DEBUG) y.print_bytes();
 
                 // validate cmd_seq & lambda result
+                std::cout << "cmd seqsy : " << y.get_cmd_seq() << " : " << cmd_seq << "\n";
                 if (y.get_cmd_seq() != cmd_seq || !func(y)) {
                     std::cout << "[PCKG ERROR] Skipping invalid package from "
                               << cmmn::get_ip(sender) << ":" << cmd_port << "\n";
@@ -198,10 +202,17 @@ namespace sik_2::client {
                 auto lambd = std::function([this, &accept, filename](cmds::Cmplx_cmd ans)->bool {
                     // validate answers - we expect "NO_WAY" or "CAN_ADD"
                     if (ans.get_cmd().compare(cmmn::no_way_) == 0) {
+                        // data contains filename -ok, ignore; else error
                         return (ans.get_data().compare(filename) == 0);
-
-                    } else if (ans.get_cmd().compare(cmmn::can_add_)) {
+                    } else if (ans.get_cmd().compare(cmmn::can_add_) == 0) {
                         accept = true;
+                        sckt::socket_TCP_out tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) ans.get_param()};
+
+                        // TODO tu pewnie mieć w zmiennej ten filesize a nie od nowa odczytywać!
+                        // char *bufr = "wiewiorki wiewior";
+                        // tcp_sock.send_bytes(bufr, fs::file_size(out_fldr + filename));
+                        int fd = open((out_fldr + filename).c_str(), O_RDONLY);
+                        sendfile(fd, tcp_sock.get_sock(), 0, fs::file_size(out_fldr + filename));
                         //TODO tcp
                         return true;
                     } else { // unknown cmd
@@ -211,9 +222,9 @@ namespace sik_2::client {
 
                 // while nobody has accepted our "ADD" request, we keep trying
                 if (!accept) {
+                    std::cout << "filesize :: " << fs::file_size(out_fldr + filename) << "\n";
                     send_and_recv(cmds::Cmplx_cmd{cmmn::add_, get_next_seq(), fs::file_size(out_fldr + filename),
-                                                  filename},
-                                  ser.second, seq, lambd);
+                                                  filename}, ser.second, seq, lambd);
                 } else {
                     break;
                 }

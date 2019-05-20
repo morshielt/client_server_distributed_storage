@@ -6,6 +6,8 @@
 #include <regex>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
 #include "../common/validation.hpp"
 #include "../common/sockets.hpp"
 #include "../common/commands.hpp"
@@ -75,7 +77,6 @@ namespace sik_2::server {
                 case cmmn::Request::discover: {
                     if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
                     cmds::Simpl_cmd cmd{buffer, rcv_len};
-                    cmd.print_bytes();
 
                     if (cmd.get_data().empty() && cmd.get_cmd().compare(cmmn::hello_) == 0)
                         ans_discover(s, cmd);
@@ -95,7 +96,6 @@ namespace sik_2::server {
                 case cmmn::Request::upload: {
                     if (cmmn::DEBUG) std::cout << "UPLOAD" << "\n";
                     cmds::Cmplx_cmd cmd{buffer, rcv_len};
-                    cmd.print_bytes();
 
                     if (cmd.get_cmd().compare(cmmn::add_) == 0)
                         ans_upload(s, cmd);
@@ -122,11 +122,8 @@ namespace sik_2::server {
 
         void ans_discover(sckt::socket_UDP &s, cmds::Simpl_cmd cmd) {
 
-            if (cmmn::DEBUG) cmd.print_bytes();
-
             cmds::Cmplx_cmd x{cmmn::good_day_, cmd.get_cmd_seq(), f_manager.get_free_space(), mcast_addr.c_str()};
-            x.print_bytes();
-            // odsyłamy czas tam, skąd dostaliśmy cmmn::Requesta
+
             struct sockaddr sender = s.get_sender();
             sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, &sender, sizeof(sender));
             std::cout << "sent answer\n";
@@ -135,13 +132,20 @@ namespace sik_2::server {
         void ans_upload(sckt::socket_UDP &s, cmds::Cmplx_cmd cmd) {
 
             struct sockaddr sender = s.get_sender();
+
             if (!cmd.get_data().empty() && cmd.get_data().find('/') == std::string::npos &&
                 cmd.get_param() < f_manager.get_free_space() && f_manager.filename_nontaken(cmd.get_data())) {
 
-                sckt::socket_TCP_in tcp_sock{timeout};
-                //TODO TCP
-                cmds::Cmplx_cmd x{cmmn::good_day_, cmd.get_cmd_seq(), tcp_sock.get_port(), ""};
+                sckt::socket_TCP_in tcp_sock{timeout, cmmn::get_ip(sender)};
+
+                cmds::Cmplx_cmd x{cmmn::can_add_, cmd.get_cmd_seq(), tcp_sock.get_port(), ""};
                 sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
+
+                tcp_sock.get_connection();
+
+                int fd = open((shdr_fldr + cmd.get_data()).c_str(), O_CREAT);
+                sendfile(tcp_sock.get_sock(), fd, 0, cmd.get_param());
+
             } else {
                 cmds::Simpl_cmd x{cmmn::no_way_, cmd.get_cmd_seq(), cmd.get_data()};
                 sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
@@ -149,6 +153,7 @@ namespace sik_2::server {
         }
 
         cmmn::Request recognise_request(char x) {
+
             switch (x) {
                 case 'H': { // hello
                     return cmmn::Request::discover;

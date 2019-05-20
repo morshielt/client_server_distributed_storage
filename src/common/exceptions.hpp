@@ -28,7 +28,7 @@ namespace sik_2::exceptions {
 
     public:
         // działa tylko z rvalue, jakby co usunąć &&
-        explicit Socket_excpt(std::string &&msg) : Excpt_with_msg{"invalid argument " + std::move(msg)} {}
+        explicit Socket_excpt(std::string &&msg) : Excpt_with_msg{"socket exception " + std::move(msg)} {}
     };
 
 
