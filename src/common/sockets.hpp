@@ -22,18 +22,18 @@ namespace sik_2::sockets {
 
         socket_(int32_t timeout) : timeout{timeout} {
             if (!valid::in_range_incl<int32_t>(timeout, 1, cmmn::MAX_TIMEOUT)) {
-                throw excpt::Invalid_argument{"timeout = " + std::to_string(timeout)};
+                throw excpt::invalid_argument{"timeout = " + std::to_string(timeout)};
             }
         }
 
         void throw_close(int line) {
             std::cout << "throw_close :: " << line << "\n";
             if (sock >= 0) close(sock);
-            throw excpt::Socket_excpt(std::strerror(errno));
+            throw excpt::socket_excpt(std::strerror(errno));
         }
 
     public:
-        int get_sock() {
+        virtual int get_sock() {
             return sock;
         }
     };
@@ -88,7 +88,6 @@ namespace sik_2::sockets {
 
         // TODO timeout = 0?
         bool update_timeout() {
-            // TODO kiedy to zwraca false? XD
             struct timeval curr;
             gettimeofday(&curr, nullptr);
 
@@ -101,7 +100,12 @@ namespace sik_2::sockets {
                 diff.tv_usec += 1000000;
             }
 
-            std::cout << diff.tv_sec << " " << diff.tv_usec << "\n";
+            // TODO czy false jest ok?
+            if (diff.tv_sec < 0 || diff.tv_usec < 0) {
+                return false;
+            }
+
+            // std::cout << diff.tv_sec << " " << diff.tv_usec << "\n";
 
             if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *) &diff, sizeof diff) < 0)
                 throw_close(__LINE__);
@@ -158,12 +162,7 @@ namespace sik_2::sockets {
         }
 
         ~socket_UDP() {
-            // todo ?
-            /* w taki sposób można odpiąć się od grupy rozsyłania */
-            // if (setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void *) &ip_mreq, sizeof ip_mreq) < 0) {
-            //     throw std::system_error(EFAULT, std::generic_category());
-            // }
-
+            // TODO to może rzucić, co wtedyyyy? xD nic? ok.
             setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void *) &ip_mreq, sizeof ip_mreq);
             /* koniec */
             // zamykać jak wychodzę z grupy czy nie D:?
@@ -193,30 +192,32 @@ namespace sik_2::sockets {
             // since all execution paths exit immediately, sock would be closed when program terminates
 
             server_address.sin_family = AF_INET; // IPv4
-            // server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
-            std::cout << "\"" << addr.c_str() << "\"\n";
-            server_address.sin_addr.s_addr = inet_addr(addr.c_str());
+            server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
+            // std::cout << "\"" << addr.c_str() << "\"\n";
+            // server_address.sin_addr.s_addr = inet_addr(addr.c_str());
             server_address.sin_port = htons(0); // listening on port PORT_NUM
 
             // bind the socket to a concrete address
             if (bind(sock, (struct sockaddr *) &server_address, sizeof(server_address)) < 0)
                 throw_close(__LINE__);
-            // switch to listening (passive open)
-            if (listen(sock, QUEUE_LENGTH) < 0)
-                throw_close(__LINE__);
 
-            // timeout
-            struct timeval diff;
-            diff.tv_sec = timeout;
-            diff.tv_usec = 0;
-            if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *) &diff, sizeof diff) < 0)
-                throw_close(__LINE__);
+            // // timeout
+            // struct timeval diff;
+            // diff.tv_sec = timeout;
+            // diff.tv_usec = 0;
+            // if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *) &diff, sizeof diff) < 0)
+            //     throw_close(__LINE__);
 
             socklen_t server_address_len = sizeof(server_address);
             if (getsockname(sock, (struct sockaddr *) &server_address, &server_address_len) < 0)
                 throw_close(__LINE__);
 
             port = ntohs(server_address.sin_port);
+
+
+            // switch to listening (passive open)
+            if (listen(sock, QUEUE_LENGTH) < 0)
+                throw_close(__LINE__);
 
             printf("accepting client connections on port %hu\n", ntohs(server_address.sin_port));
 
@@ -234,6 +235,13 @@ namespace sik_2::sockets {
             client_address_len = sizeof(client_address);
             msg_sock = accept(sock, (struct sockaddr *) &client_address, &client_address_len);
 
+            // timeout
+            struct timeval diff;
+            diff.tv_sec = timeout;
+            diff.tv_usec = 0;
+            if (setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (const char *) &diff, sizeof diff) < 0)
+                throw_close(__LINE__);
+
             if (msg_sock == -1)
                 throw_close(__LINE__);
         }
@@ -242,39 +250,23 @@ namespace sik_2::sockets {
             return port;
         }
 
+        uint32_t get_port_be() {
+            return htons(port);
+        }
+
+        int get_sock() override {
+            return msg_sock;
+        }
+
         ~socket_TCP_in() {
             close(msg_sock);
             close(sock);
         }
-
-        // void send_bytes(char *buffer, uint32_t expected) {
-        //     errno = 0;
-        //     ssize_t bytes = send(msg_sock, buffer, expected, MSG_NOSIGNAL);
-        //
-        //     if (errno != 0 || bytes < expected) {
-        //         throw_close(__LINE__);
-        //     }
-        // }
-        //
-        // void recieve_bytes(char *buffer, uint32_t expected) {
-        //     // TODO ????????????? co jak 0??????
-        //     if (expected == 0) {
-        //         printf("recv 0 bytes, error.\n");
-        //         throw_close(__LINE__);
-        //     }
-        //
-        //     ssize_t bytes = recv(msg_sock, buffer, expected, MSG_WAITALL);
-        //
-        //     if (bytes < expected) {
-        //         throw_close(__LINE__);
-        //     }
-        // }
     };
 
     class socket_TCP_out : public socket_ {
 
     private:
-        int msg_sock;
         // int32_t port;
 
     public:
@@ -287,49 +279,33 @@ namespace sik_2::sockets {
             addr_hints.ai_family = AF_INET; // IPv4
             addr_hints.ai_socktype = SOCK_STREAM;
             addr_hints.ai_protocol = IPPROTO_TCP;
+
+            std::cout << "std::to_string(port).c_str() " << std::to_string(port).c_str() << "\n";
+            std::cout << "addr.c_str() " << addr.c_str() << "\n";
             if (getaddrinfo(addr.c_str(), std::to_string(port).c_str(), &addr_hints, &addr_result) != 0) {
-                throw excpt::Socket_excpt(std::strerror(errno));
+                std::cout << __LINE__ << " " << __FILE__ << "\n";
+                throw excpt::socket_excpt(std::strerror(errno));
             }
 
             // initialize socket according to getaddrinfo results
             sock = socket(addr_result->ai_family, addr_result->ai_socktype, addr_result->ai_protocol);
-            if (sock < 0)
+            if (sock < 0) {
+                std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw_close(__LINE__);
+            }
 
             // connect socket to the server
-            if (connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0)
+            if (connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0) {
+                std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw_close(__LINE__);
+            }
 
             freeaddrinfo(addr_result);
-
         }
 
         ~socket_TCP_out() {
             close(sock);
         }
-
-        // void send_bytes(char *buffer, uint32_t expected) {
-        //     errno = 0;
-        //     ssize_t bytes = send(sock, buffer, expected, MSG_NOSIGNAL);
-        //
-        //     if (errno != 0 || bytes < expected) {
-        //         throw_close(__LINE__);
-        //     }
-        // }
-        //
-        // void recieve_bytes(char *buffer, uint32_t expected) {
-        //     // TODO ????????????? co jak 0??????
-        //     if (expected == 0) {
-        //         printf("recv 0 bytes, error.\n");
-        //         throw_close(__LINE__);
-        //     }
-        //
-        //     ssize_t bytes = recv(sock, buffer, expected, MSG_WAITALL);
-        //
-        //     if (bytes < expected) {
-        //         throw_close(__LINE__);
-        //     }
-        // }
     };
 }
 

@@ -22,7 +22,7 @@ namespace sik_2::request_parser {
         const std::string OPTIONS{DISCOVER + "|" + SEARCH + "|" + FETCH + "|" + UPLOAD + "|" + REMOVE + "|" + EXIT};
     }
 
-    class Request_parser {
+    class request_parser {
 
     private:
         const std::string REQUEST{"^\\s*(" + OPTIONS + ")" + ANY_END};

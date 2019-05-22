@@ -9,8 +9,13 @@ namespace cmmn = sik_2::common;
 
 namespace sik_2::commands {
 
+    namespace {
+        const size_t S_OFFSET = cmmn::CMD_SIZE + sizeof(uint64_t);
+        const size_t C_OFFSET = cmmn::CMD_SIZE + 2 * sizeof(uint64_t);
+    }
+
     // TODO struct __packed__ blablablablablablablbablalbablalb
-    class Simpl_cmd {
+    class simpl_cmd {
 
     protected:
         std::string msg;
@@ -18,7 +23,8 @@ namespace sik_2::commands {
         std::uint64_t size_;
 
     protected:
-        Simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data, uint64_t data_offset)
+
+        simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data, uint64_t data_offset)
             : data_offset{data_offset}, size_{data.length() + data_offset} {
 
             // cmd
@@ -35,7 +41,7 @@ namespace sik_2::commands {
             if (cmmn::DEBUG) print_bytes();
         }
 
-        Simpl_cmd(char *whole, uint64_t size, uint64_t data_offset)
+        simpl_cmd(char *whole, uint64_t size, uint64_t data_offset)
             : data_offset{data_offset}, size_{size} {
 
             msg = std::string{whole, size_};
@@ -44,16 +50,17 @@ namespace sik_2::commands {
         }
 
     public:
-        Simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data)
-            : Simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + sizeof(uint64_t)) {
 
-            std::cout << ">> 3 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
+        simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data)
+            : simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + sizeof(uint64_t)) {
+
+            // std::cout << ">> 3 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
         }
 
-        Simpl_cmd(char *whole, uint64_t size)
-            : Simpl_cmd(whole, size, cmmn::CMD_SIZE + sizeof(uint64_t)) {
+        simpl_cmd(char *whole, uint64_t size)
+            : simpl_cmd(whole, size, cmmn::CMD_SIZE + sizeof(uint64_t)) {
 
-            std::cout << ">> 4 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
+            // std::cout << ">> 4 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
         }
 
         char *get_raw_msg() {
@@ -76,8 +83,8 @@ namespace sik_2::commands {
             return be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE));
         }
 
-        size_t get_data_offset() {
-            return data_offset;
+        virtual size_t get_data_offset() {
+            return S_OFFSET;
         }
 
         void print_bytes() {
@@ -97,24 +104,30 @@ namespace sik_2::commands {
         }
     };
 
-    class Cmplx_cmd : public Simpl_cmd {
+    class cmplx_cmd : public simpl_cmd {
 
     public:
-        Cmplx_cmd(const std::string &cmd, uint64_t cmd_seq, uint64_t param, const std::string &data)
-            : Simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {
+        cmplx_cmd(const std::string &cmd, uint64_t cmd_seq, uint64_t param, const std::string &data)
+            : simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {
 
             // param
+            std::cout << param << "\n";
             uint64_t be_param = htobe64(param);
             memcpy(msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t), &be_param, sizeof(uint64_t));
         }
 
-        Cmplx_cmd(char *whole, uint64_t size)
-            : Simpl_cmd(whole, size, cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {}
+        cmplx_cmd(char *whole, uint64_t size)
+            : simpl_cmd(whole, size, cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {}
 
         uint64_t get_param() {
             return be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t)));
         }
+
+        size_t get_data_offset() override {
+            return C_OFFSET;
+        }
     };
+
 }
 
 #endif //COMMANDS_HPP

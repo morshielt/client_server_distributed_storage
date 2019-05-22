@@ -1,5 +1,8 @@
-#include "client/Client.hpp"
+#include "server/server.hpp"
+
+#include "server/server.hpp"
 #include <boost/program_options.hpp>
+
 #include <iostream>
 #include <string> // jest w iostream, ale to jest shady~
 #include <cstdint>
@@ -7,12 +10,16 @@
 namespace opt = boost::program_options;
 namespace cmmn = sik_2::common;
 
-int main(int argc, const char *argv[]) {
+namespace {
+    const int DEF_MAX_SPACE = 52428800;
+}
 
+int main(int argc, const char *argv[]) {
     std::string mcast_addr;
     int32_t cmd_port;
-    std::string out_fldr;
+    std::string shdr_fldr;
     int32_t timeout;
+    int64_t max_space;
 
     opt::options_description opt_desc("Options");
     opt::variables_map vm;
@@ -22,7 +29,8 @@ int main(int argc, const char *argv[]) {
             ("help,h", "produce help message")
             (",g", opt::value<std::string>(&mcast_addr)->required(), "mcast_addr")
             (",p", opt::value<int32_t>(&cmd_port)->required(), "cmd_port")
-            (",o", opt::value<std::string>(&out_fldr)->required(), "out_fldr")
+            (",f", opt::value<std::string>(&shdr_fldr)->required(), "shdr_fldr")
+            (",b", opt::value<int64_t>(&max_space)->default_value(cmmn::DEF_SPACE), "max_space")
             (",t", opt::value<int32_t>(&timeout)->default_value(cmmn::DEF_TIMEOUT), "timeout");
 
         opt::store(opt::parse_command_line(argc, argv, opt_desc), vm);
@@ -30,7 +38,8 @@ int main(int argc, const char *argv[]) {
 
         if (cmmn::DEBUG) std::cout << "mcast_addr " << mcast_addr << "\n";
         if (cmmn::DEBUG) std::cout << "cmd_port " << cmd_port << "\n";
-        if (cmmn::DEBUG) std::cout << "out_fldr " << out_fldr << "\n";
+        if (cmmn::DEBUG) std::cout << "shdr_fldr " << shdr_fldr << "\n";
+        if (cmmn::DEBUG) std::cout << "max_space " << max_space << "\n";
         if (cmmn::DEBUG) std::cout << "timeout " << timeout << "\n";
 
     } catch (const std::exception &e) {
@@ -44,23 +53,10 @@ int main(int argc, const char *argv[]) {
     }
 
     try {
-        sik_2::client::Client c{mcast_addr, cmd_port, out_fldr, timeout};
-        c.run();
-
+        sik_2::server::server s{mcast_addr, cmd_port, shdr_fldr, max_space, timeout};
+        s.run();
     } catch (std::exception &e) {
         std::cerr << "ERROR: " << e.what() << "\n";
         exit(1);
     }
-
-
-    // std::string str{cmmn::hello_, 10};
-    // std::cout << "|" + str << "|" << "\n";
-    //
-    // size_t n = 100;
-    // std::string msg(n, '-');
-    // std::cout << msg << "\n";
-    //
-    // std::cout << std::string(n, '-') << "\n";
-
-
 }

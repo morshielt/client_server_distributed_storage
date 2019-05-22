@@ -4,10 +4,10 @@ BOOST = -lboost_program_options -lboost_system -lboost_filesystem
 
 all: netstore-server netstore-client
 
-netstore-server: src/Server.cpp
+netstore-server: src/server.cpp
 	$(CXX) $(FLAGS) $< $(BOOST) -o $@
 
-netstore-client: src/Client.cpp
+netstore-client: src/client.cpp
 	$(CXX) $(FLAGS) $< $(BOOST) -o $@
 
 .PHONY: clean
