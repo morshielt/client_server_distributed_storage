@@ -21,11 +21,13 @@ namespace sik_2::common {
     static const int32_t MAX_TIMEOUT{300};
     static const int32_t DEF_SPACE{52428800};
     static const int32_t MAX_PORT{65535};
-    static const int32_t TTL_VALUE{4};
+    static const int32_t TTL_VALUE{64};
     // static const int32_t MAX_UDP_PACKET_SIZE{65507};
     static const int32_t MAX_UDP_PACKET_SIZE{65507}; // TODO -S_OFFSET lub  -C_OFFSET, ughr~
     static const int32_t BUFFER_SIZE{512 * 1024}; // TODO -S_OFFSET lub  -C_OFFSET, ughr~
     static const size_t CMD_SIZE = 10;
+    static const int32_t SOCK_TOUT{1};
+
 
     static const char SEP = '\n';
     static const int ERROR = -1;
@@ -117,6 +119,45 @@ namespace sik_2::common {
         printf("Recieved all.\n");
     }
 
+    void receive_file(std::string path, int sock) {
+        FILE *fp = fopen(path.c_str(), "w+b"); // file existed
+        if (!fp) {
+            std::cout << __LINE__ << " " << __FILE__ << "\n";
+            throw excpt::file_excpt(std::strerror(errno));
+        }
+
+        char buffer[BUFFER_SIZE];
+
+        ssize_t recieved = 1;
+        while (recieved != 0 && recieved != -1) {
+            // recieve_bytes(buffer, sock, BUFFER_SIZE);
+            recieved = recv(sock, buffer, BUFFER_SIZE, 0);
+
+            if (recieved < 0) {
+                std::cout << __LINE__ << " " << __FILE__ << "\n";
+                throw excpt::file_excpt(std::strerror(errno));
+            }
+
+            if (fwrite(buffer, 1, recieved, fp) != (size_t) recieved) {
+                std::cout << __LINE__ << " " << __FILE__ << "\n";
+                throw excpt::file_excpt(std::strerror(errno));
+            }
+        }
+
+        // if (fwrite(buffer, 1, f_size - recieved, fp) != f_size - recieved) {
+        //     fclose(fp);
+        //     std::cout << __LINE__ << " " << __FILE__ << "\n";
+        //     throw excpt::file_excpt(std::strerror(errno));
+        // }
+
+        if (fclose(fp) == EOF) {
+            std::cout << __LINE__ << " " << __FILE__ << "\n";
+            throw excpt::file_excpt(std::strerror(errno));
+        }
+
+        printf("Recieved all.\n");
+    }
+
     void send_file(std::string path, size_t f_size, int sock) {
         FILE *fp = fopen(path.c_str(), "rb");
         if (!fp) {
@@ -124,7 +165,7 @@ namespace sik_2::common {
             throw excpt::file_excpt(std::strerror(errno));
         }
 
-        int sent;
+        uint32_t sent;
         char buffer[BUFFER_SIZE];
 
         for (sent = BUFFER_SIZE; sent < f_size; sent += BUFFER_SIZE) {

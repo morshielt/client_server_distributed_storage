@@ -46,20 +46,20 @@ namespace sik_2::validation {
     }
 
     // TODO  wywala jak jest permission denied, czy słusznie?
-    static bool valid_directory(std::string path) {
-        try {
-            if (cmmn::DEBUG) {
-                const fs::file_status file = fs::status(path);
-                std::cout << "file.type() " << file.type() << "\n";
-                std::cout << "file.permissions() " << file.permissions() << "\n";
-            }
-
-            fs::directory_iterator i(path); // działa jak próba otworzenia, wywala perm denied jak trzeba
-            return fs::is_directory(path);
-        } catch (...) {
-            throw;
-        }
-    }
+    // static bool valid_directory(std::string path) {
+    //     try {
+    //         if (cmmn::DEBUG) {
+    //             const fs::file_status file = fs::status(path);
+    //             std::cout << "file.type() " << file.type() << "\n";
+    //             std::cout << "file.permissions() " << file.permissions() << "\n";
+    //         }
+    //
+    //         fs::directory_iterator i(path); // działa jak próba otworzenia, wywala perm denied jak trzeba
+    //         return fs::is_directory(path);
+    //     } catch (...) {
+    //         throw;
+    //     }
+    // }
 
     template<typename T>
     bool in_range_incl(T value, T min, T max) {

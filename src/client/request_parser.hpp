@@ -1,5 +1,3 @@
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "MemberFunctionCanBeStaticInspection"
 #ifndef REQUEST_PARSER_HPP
 #define REQUEST_PARSER_HPP
 
@@ -38,9 +36,6 @@ namespace sik_2::request_parser {
                 std::regex_match(line.c_str(), cm, re);
 
                 if (cmmn::DEBUG) {
-                    std::cout << "string literal with " << cm.size() << " matches\n";
-
-                    std::cout << "the matches were: ";
                     for (const auto &i : cm) {
                         std::cout << "[" << i << "] ";
                     }
@@ -60,7 +55,7 @@ namespace sik_2::request_parser {
                 case 'D':
                 case 'd': {
                     if (param.empty()) return cmmn::Request::discover;
-                    return cmmn::Request::unknown;
+                    break;
                 }
                 case 'S':
                 case 's': {
@@ -69,27 +64,25 @@ namespace sik_2::request_parser {
                 case 'F':
                 case 'f': {
                     if (!param.empty()) return cmmn::Request::fetch;
-                    return cmmn::Request::unknown;
+                    break;
                 }
                 case 'U':
                 case 'u': {
                     if (!param.empty()) return cmmn::Request::upload;
-                    return cmmn::Request::unknown;
+                    break;
                 }
                 case 'R':
                 case 'r': {
                     if (!param.empty()) return cmmn::Request::remove;
-                    return cmmn::Request::unknown;
+                    break;
                 }
                 case 'E':
                 case 'e': {
                     if (param.empty()) return cmmn::Request::exit;
-                    return cmmn::Request::unknown;
-                }
-                default: {
-                    return cmmn::Request::unknown;
+                    break;
                 }
             }
+            return cmmn::Request::unknown;
         }
 
     public:

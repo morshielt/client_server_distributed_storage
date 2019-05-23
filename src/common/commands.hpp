@@ -88,7 +88,7 @@ namespace sik_2::commands {
         }
 
         void print_bytes() {
-            for (int j = 0; j < cmmn::CMD_SIZE; ++j) {
+            for (uint32_t j = 0; j < cmmn::CMD_SIZE; ++j) {
                 printf("%c ", (const unsigned char) msg.data()[j]);
             }
             std::cout << " | " << be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE)) << " | ";
@@ -97,7 +97,7 @@ namespace sik_2::commands {
                 std::cout << be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t))) << " | ";
             }
 
-            for (int i = data_offset; i < msg.length(); ++i) {
+            for (uint32_t i = data_offset; i < msg.length(); ++i) {
                 printf("%c ", msg.data()[i]);
             }
             std::cout << " |\n";

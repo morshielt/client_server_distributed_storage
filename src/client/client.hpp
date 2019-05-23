@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <regex>
+#include <thread>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <set>
@@ -25,8 +26,25 @@ namespace sckt = sik_2::sockets;
 namespace cmmn = sik_2::common;
 
 
+// popaczeć timeouty, na ready, write'y podopisywać bo się zawiesi
+// SIGPIPE ogarnąć~
 // TODO nowe sockety dla fetcha
 namespace sik_2::client {
+
+    bool valid_directory(std::string path) {
+        try {
+            if (cmmn::DEBUG) {
+                const fs::file_status file = fs::status(path);
+                std::cout << "file.type() " << file.type() << "\n";
+                std::cout << "file.permissions() " << file.permissions() << "\n";
+            }
+
+            fs::directory_iterator i(path); // działa jak próba otworzenia, wywala perm denied jak trzeba
+            return fs::is_directory(path);
+        } catch (...) {
+            throw;
+        }
+    }
 
     class client {
 
@@ -35,15 +53,20 @@ namespace sik_2::client {
         int32_t cmd_port;
         std::string out_fldr;
         int32_t timeout;
-        uint64_t seq{};
+        std::atomic<uint64_t> seq{};
 
         std::set<std::pair<uint64_t, std::string>, std::greater<>> servers{};
-        struct sockaddr sender{};
+        // TODO bo to będzie źle chyba jak to będą wątki a to jest globalna zmienna, to będzie jakaś masakra D:
+        // to chyba tzreba dać przez referencję DDDDDDDDDDDDDDDDDDD:
+        // struct sockaddr sender{};
 
         std::map<std::string, std::string> available_files{}; // filename -> ip
 
         reqp::request_parser req_parser;
 
+        // TODO bo to będzie źle chyba jak to będą wątki a to jest globalna zmienna, to będzie jakaś masakra D:
+        // to chyba tzreba dać przez referencję DDDDDDDDDDDDDDDDDDD:
+        // SEQ to samo!
         uint64_t get_next_seq() {
             return seq++;
         }
@@ -62,7 +85,7 @@ namespace sik_2::client {
             if (!valid::in_range_incl<int32_t>(cmd_port, 0, cmmn::MAX_PORT))
                 throw excpt::invalid_argument{"cmd_port = " + std::to_string(cmd_port)};
 
-            if (!valid::valid_directory(out_fldr))
+            if (!valid_directory(out_fldr))
                 throw excpt::invalid_argument{"out_fldr = " + out_fldr};
         }
 
@@ -76,33 +99,39 @@ namespace sik_2::client {
                 switch (req_parser.next_request(param)) {
                     case cmmn::Request::discover: {
                         if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
-                        do_discover(false);
+                        std::thread t{[this] { do_discover(false); }};
+                        t.detach();
                         break;
                     }
                     case cmmn::Request::search: {
                         if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
-                        do_search(param);
+                        std::thread t{[this, &param] { do_search(param); }};
+                        t.detach();
                         break;
                     }
                     case cmmn::Request::fetch: {
                         if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
-                        if (is_fetchable(param)) do_fetch(param);
-                        else std::cout << "WRONK FETCH\n";
-
+                        if (is_fetchable(param)) {
+                            std::thread t{[this, &param] { do_fetch(param); }};
+                            t.detach();
+                        } else std::cout << "WRONK FETCH\n";
                         break;
                     }
                     case cmmn::Request::upload: {
                         if (cmmn::DEBUG) std::cout << "UPLOAD" << "\n";
-                        do_upload(param);
+                        std::thread t{[this, &param] { do_upload(param); }};
+                        t.detach();
                         break;
                     }
                     case cmmn::Request::remove: {
                         if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
-                        do_remove(param);
+                        std::thread t{[this, &param] { do_remove(param); }};
+                        t.detach();
                         break;
                     }
-                    case cmmn::Request::exit: {
+                    case cmmn::Request::exit: { // TODO zamyka połączenia? jak bd wątki to bd ok czy nie? xD
                         if (cmmn::DEBUG) std::cout << "EXIT" << "\n";
+                        return;
                         break;
                     }
                     default: {
@@ -115,7 +144,7 @@ namespace sik_2::client {
     private:
         template<typename Send_type, typename Recv_type>
         void send_and_recv(Send_type s_cmd, const std::string &addr, uint64_t cmd_seq,
-                           std::function<bool(Recv_type ans)> &func) {
+                           std::function<bool(Recv_type ans)> &func, struct sockaddr &sender) {
 
             char buffer[cmmn::MAX_UDP_PACKET_SIZE];
             ssize_t ret{0};
@@ -127,7 +156,7 @@ namespace sik_2::client {
                 udpm_sock.get_remote_address(), sizeof(*udpm_sock.get_remote_address()));
 
             // TODO czy my w ogóle chcemy ifować EWOULDBLOCK i EAGAIN?
-            // co to ma być? D:
+            // czy my chcemy przy wysyłaniu? czy tylko receivie?
             if (ret == -1 && !(errno == EWOULDBLOCK || errno == EAGAIN)) {
                 std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw excpt::socket_excpt(std::strerror(errno));
@@ -135,9 +164,9 @@ namespace sik_2::client {
 
             // wait 'timeout' seconds for answers
             udpm_sock.set_timestamp();
-            bool teges;
-            while (teges = udpm_sock.update_timeout()) {
-                assert(teges == true);
+
+            while (udpm_sock.update_timeout()) {
+
                 socklen_t sendsize = sizeof(sender);
                 memset(&sender, 0, sizeof(sender));
                 ret = recvfrom(udpm_sock.get_sock(), buffer, sizeof(buffer), 0, &sender, &sendsize);
@@ -169,8 +198,9 @@ namespace sik_2::client {
         }
 
         void do_discover(bool upload) {
+            struct sockaddr sender{};
 
-            auto lambd = std::function([this, upload](cmds::cmplx_cmd ans)->bool {
+            auto lambd = std::function([this, upload, &sender](cmds::cmplx_cmd ans)->bool {
                 // validate cmd - we expect "GOOD DAY"
                 if (ans.get_cmd().compare(cmmn::good_day_) != 0) {
                     return false;
@@ -186,12 +216,14 @@ namespace sik_2::client {
             });
 
             if (upload) servers.clear();
-            send_and_recv(cmds::simpl_cmd{cmmn::hello_, get_next_seq(), ""}, mcast_addr, seq, lambd);
+            uint64_t curr_seq = get_next_seq();
+            send_and_recv(cmds::simpl_cmd{cmmn::hello_, curr_seq, ""}, mcast_addr, curr_seq, lambd, sender);
+            std::cout << "jest po do_discover.\n";
         }
 
         // TODO nowy thread na do_shit~
-        // TODO nie działa.
         void do_upload(const std::string &filename) {
+            struct sockaddr sender{};
 
             if (!fs::exists(cmmn::get_path(out_fldr, filename))) {
                 std::cerr << "File " << filename << " does not exist\n";
@@ -212,7 +244,8 @@ namespace sik_2::client {
             if (!servers.empty()) {
                 for (auto &ser : servers) {
 
-                    auto lambd = std::function([this, &accept, filename, file_size](cmds::simpl_cmd ans)->bool {
+                    auto lambd = std::function([this, &accept, &sender, filename, file_size](cmds::simpl_cmd ans)
+                                                   ->bool {
                         // validate answers - we expect "NO_WAY" or "CAN_ADD"
                         if (ans.get_cmd().compare(cmmn::no_way_) == 0) {
 
@@ -230,13 +263,11 @@ namespace sik_2::client {
                                 std::cout << "File " << filename << " uploaded ("
                                           << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
                                           << ")\n";
-                            }
-                            catch (excpt::file_excpt &e) {
+                            } catch (excpt::file_excpt &e) {
                                 std::cout << "File " << filename << " uploading failed ("
                                           << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
                                           << ") " << e.what() << "\n";
                             }
-
 
                             return true;
                         } else { // unknown cmd
@@ -247,32 +278,36 @@ namespace sik_2::client {
                     // while nobody has accepted our "ADD" request, we keep trying
                     if (!accept) {
                         std::cout << "filesize :: " << file_size << "\n";
-                        send_and_recv(cmds::cmplx_cmd{cmmn::add_, get_next_seq(), file_size, filename},
-                                      ser.second, seq, lambd);
+                        uint64_t curr_seq = get_next_seq();
+                        send_and_recv(cmds::cmplx_cmd{cmmn::add_, curr_seq, file_size, filename},
+                                      ser.second, curr_seq, lambd, sender);
                     } else {
                         break;
                     }
                 }
             }
+            std::cout << "jest po do_upload.\n";
         }
 
         void do_search(const std::string &sub) {
-
-            auto lambd = std::function([this](cmds::simpl_cmd ans)->bool {
+            struct sockaddr sender{};
+            auto lambd = std::function([this, &sender](cmds::simpl_cmd ans)->bool {
                 if (ans.get_cmd().compare(cmmn::my_list_) != 0) {
                     return false;
                 }
 
-                fill_files_list(ans.get_data());
+                fill_files_list(ans.get_data(), sender);
 
                 return true;
             });
 
             available_files.clear();
-            send_and_recv(cmds::simpl_cmd{cmmn::list_, get_next_seq(), sub}, mcast_addr, seq, lambd);
+            uint64_t curr_seq = get_next_seq();
+            send_and_recv(cmds::simpl_cmd{cmmn::list_, curr_seq, sub}, mcast_addr, curr_seq, lambd, sender);
+            std::cout << "jest po do_search.\n";
         }
 
-        void fill_files_list(std::string list) {
+        void fill_files_list(std::string list, struct sockaddr sender) {
             do {
                 std::string tmp = std::string{list, 0, list.find(cmmn::SEP)};
                 std::cout << "tmp " << tmp << "\n";
@@ -282,8 +317,8 @@ namespace sik_2::client {
         }
 
         void do_fetch(const std::string &filename) {
-
-            auto lambd = std::function([this, filename](cmds::cmplx_cmd ans)->bool {
+            struct sockaddr sender{};
+            auto lambd = std::function([this, &sender, filename](cmds::cmplx_cmd ans)->bool {
                 if (ans.get_cmd().compare(cmmn::connect_me_) != 0) {
                     return false;
                 }
@@ -291,29 +326,29 @@ namespace sik_2::client {
                 assert(available_files.find(filename)->second == cmmn::get_ip(sender));
                 // TODO pobieranie aż się nie otrzyma 0, meeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehr.
 
-
                 sckt::socket_TCP_client tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) ans.get_param()};
 
-                // try {
-                //     cmmn::receive_file(cmmn::get_path(out_fldr, filename), file_size, tcp_sock.get_sock());
-                //     std::cout << "File " << filename << " uploaded ("
-                //               << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
-                //               << ")\n";
-                // }
-                // catch (excpt::file_excpt &e) {
-                //     std::cout << "File " << filename << " uploading failed ("
-                //               << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
-                //               << ") " << e.what() << "\n";
-                // }
+                try {
+                    cmmn::receive_file(cmmn::get_path(out_fldr, filename), tcp_sock.get_sock());
+                    std::cout << "File " << filename << " downloaded ("
+                              << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
+                              << ")\n";
+                }
+                catch (excpt::file_excpt &e) {
+                    std::cout << "File " << filename << " downloading failed ("
+                              << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
+                              << ") " << e.what() << "\n";
+                }
 
                 return true;
             });
 
 
             std::cout << "available_files.find(filename)->second " << available_files.find(filename)->second << "\n";
-            send_and_recv(cmds::simpl_cmd{cmmn::get_, get_next_seq(), filename},
-                          available_files.find(filename)->second, seq, lambd);
-
+            uint64_t curr_seq = get_next_seq();
+            send_and_recv(cmds::simpl_cmd{cmmn::get_, curr_seq, filename},
+                          available_files.find(filename)->second, curr_seq, lambd, sender);
+            std::cout << "jest po do_fetch.\n";
         }
 
         bool is_fetchable(const std::string &name) {
@@ -323,7 +358,8 @@ namespace sik_2::client {
         void do_remove(const std::string &filename) {
 
             sckt::socket_UDP_MCAST udpm_sock{mcast_addr, cmd_port, timeout};
-            cmds::simpl_cmd s_cmd{cmmn::del_, get_next_seq(), filename};
+            uint64_t curr_seq = get_next_seq();
+            cmds::simpl_cmd s_cmd{cmmn::del_, curr_seq, filename};
             // send request
             int ret = 0;
             ret = sendto(udpm_sock.get_sock(), s_cmd.get_raw_msg(), s_cmd.get_msg_size(), 0, (struct sockaddr *)
@@ -335,9 +371,8 @@ namespace sik_2::client {
                 std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw excpt::socket_excpt(std::strerror(errno));
             }
-
+            std::cout << "jest po do_remove.\n";
         }
-
     };
 }
 

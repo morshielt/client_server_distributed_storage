@@ -10,11 +10,12 @@ namespace valid = sik_2::validation;
 namespace fs =  boost::filesystem;
 namespace sik_2::file_manager {
     class file_manager {
+
     private:
         std::map<std::string, uint64_t> files{};
-        int64_t free_space;
-        int64_t max_space;
-        std::string shrd_fldr;
+        // int64_t free_space;
+        // int64_t max_space;
+        // std::string shrd_fldr;
 
         void init() {
             fs::path path(shrd_fldr);
@@ -52,7 +53,7 @@ namespace sik_2::file_manager {
 
     public:
         file_manager(int64_t max_space, const std::string &shrd_fldr)
-            : max_space{max_space}, free_space{max_space}, shrd_fldr{shrd_fldr} {
+            : free_space{max_space}, max_space{max_space}, shrd_fldr{shrd_fldr} {
             // if (!valid::valid_directory(shrd_fldr)) {
             //     throw excpt::invalid_argument{"shrd_fldr = " + shrd_fldr};
             // }
@@ -66,7 +67,7 @@ namespace sik_2::file_manager {
 
         uint64_t get_free_space() {
             std::cout << "get_free_space : " << free_space << "\n";
-            return free_space;
+            return (free_space > 0) ? free_space : 0;
         }
 
         bool filename_nontaken(const std::string &name) {
@@ -92,7 +93,13 @@ namespace sik_2::file_manager {
                 std::cout << "DUPA BLADA\n";
                 free_space += f_size;
                 // TODO czemu tu było "\n"????
-                files.erase({std::string{path, path.find_last_of('/'), path.length()}, f_size});
+                files.erase(std::string{path, path.find_last_of('/'), path.length()});
+
+                if (remove(path.c_str()) != 0) {
+                    // throw ? czy co
+                    std::cout << __LINE__ << "\n";
+                    std::cout << "MEH\n";
+                }
             }
         }
 
@@ -140,6 +147,20 @@ namespace sik_2::file_manager {
 
             return tmp;
         }
+
+        void send_file(std::string path, int sock) {
+            try {
+                cmmn::send_file(path, fs::file_size(path), sock);
+            } catch (excpt::file_excpt &e) {
+                std::cout << "NO WYSYŁANIE SIĘ NIE UDAŁO\n";
+            }
+        }
+
+    private:
+        int64_t free_space{};
+        int64_t max_space{};
+        std::string shrd_fldr{};
+
     };
 };
 

@@ -64,7 +64,6 @@ namespace sik_2::sockets {
             if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &optval, sizeof optval) < 0)
                 throw_close(__LINE__);
 
-
             /* ustawienie adresu i portu odbiorcy */
             remote_address.sin_family = AF_INET;
             remote_address.sin_port = htons(cmd_port);
