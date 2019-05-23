@@ -36,6 +36,7 @@ namespace sik_2::common {
     const std::string list_{"LIST\0\0\0\0\0\0", CMD_SIZE};
     const std::string my_list_{"MY_LIST\0\0\0", CMD_SIZE};
     const std::string get_{"GET\0\0\0\0\0\0\0", CMD_SIZE};
+    const std::string del_{"DEL\0\0\0\0\0\0\0", CMD_SIZE};
     const std::string connect_me_{"CONNECT_ME", CMD_SIZE};
     const std::string add_{"ADD\0\0\0\0\0\0\0", CMD_SIZE};
     const std::string no_way_{"NO_WAY\0\0\0\0", CMD_SIZE};

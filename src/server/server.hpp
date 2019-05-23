@@ -26,13 +26,13 @@ namespace sik_2::server {
     private:
         std::string mcast_addr;
         int32_t cmd_port;
-        std::string shdr_fldr;
+        std::string shrd_fldr;
         int32_t timeout;
         fm::file_manager f_manager;
 
     public:
         server(const std::string &mcast_addr, const int32_t cmd_port, const std::string &shrd_fldr, int64_t
-        max_space, int32_t timeout) : mcast_addr{mcast_addr}, cmd_port{cmd_port}, shdr_fldr{shrd_fldr},
+        max_space, int32_t timeout) : mcast_addr{mcast_addr}, cmd_port{cmd_port}, shrd_fldr{shrd_fldr},
                                       timeout{timeout}, f_manager{max_space, shrd_fldr} {
 
             if (!valid::valid_ip(mcast_addr)) {
@@ -47,8 +47,10 @@ namespace sik_2::server {
         }
 
         void run() {
-            while (true)
+            while (true) {
+                std::cout << "jestem promptem~\n";
                 get_request();
+            }
         }
 
     private:
@@ -114,6 +116,8 @@ namespace sik_2::server {
                 }
                 case cmmn::Request::remove: {
                     if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
+                    cmds::simpl_cmd cmd{buffer, rcv_len};
+                    ans_remove(s, cmd);
                     break;
                 }
                 default: {
@@ -146,7 +150,7 @@ namespace sik_2::server {
 
             do {
                 std::cout << "all : \"" << all_files << "\"\n";
-                std::string tmp = cut_nicely(all_files);
+                std::string tmp = f_manager.cut_nicely(all_files);
                 std::cout << "all after : \"" << all_files << "\"\n";
                 std::cout << "tmp :  \"" << tmp << "\"\n";
 
@@ -158,39 +162,30 @@ namespace sik_2::server {
 
         }
 
-        std::string cut_nicely(std::string &str) {
-            std::string tmp{str, 0, std::min<size_t>(cmmn::MAX_UDP_PACKET_SIZE, str.length())};
-
-            size_t last = tmp.find_last_of('\n');
-            std::cout << "last " << last << "end: " << (tmp.length() - 1) << "\n";
-
-            tmp = std::string{tmp, 0, last};
-            str = std::string{str, last + 1, str.length()};
-
-            return tmp;
-        }
-
         void ans_upload(sckt::socket_UDP &s, cmds::cmplx_cmd cmd) {
 
             struct sockaddr sender = s.get_sender();
 
             // TODO lock
-            if (!cmd.get_data().empty() && cmd.get_data().find('/') == std::string::npos &&
-                cmd.get_param() < f_manager.get_free_space() && f_manager.filename_nontaken(cmd.get_data())) {
+            if (f_manager.add_file(cmd.get_data(), cmd.get_param())) {
 
-                sckt::socket_TCP_in tcp_sock{timeout, cmmn::get_ip(sender)};
+                sckt::socket_TCP_server tcp_sock{timeout, cmmn::get_ip(sender)};
 
                 cmds::cmplx_cmd x{cmmn::can_add_, cmd.get_cmd_seq(), tcp_sock.get_port(), ""};
 
                 sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
 
                 tcp_sock.get_connection();
-                f_manager.save_file(tcp_sock.get_sock(), shdr_fldr + cmd.get_data(), cmd.get_param());
+                f_manager.save_file(tcp_sock.get_sock(), cmmn::get_path(shrd_fldr, cmd.get_data()), cmd.get_param());
 
             } else {
                 cmds::simpl_cmd x{cmmn::no_way_, cmd.get_cmd_seq(), cmd.get_data()};
                 sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
             }
+        }
+
+        void ans_remove(sckt::socket_UDP &s, cmds::simpl_cmd cmd) {
+            f_manager.remove_file(cmmn::get_path(shrd_fldr, cmd.get_data()));
         }
 
         cmmn::Request recognise_request(char x) {

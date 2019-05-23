@@ -175,14 +175,14 @@ namespace sik_2::sockets {
         const int QUEUE_LENGTH{5};
     }
 
-    class socket_TCP_in : public socket_ {
+    class socket_TCP_server : public socket_ {
 
     private:
         int msg_sock;
         int32_t port;
 
     public:
-        socket_TCP_in(int32_t timeout, std::string addr) : socket_{timeout} {
+        socket_TCP_server(int32_t timeout, std::string addr) : socket_{timeout} {
             struct sockaddr_in server_address;
 
             sock = socket(PF_INET, SOCK_STREAM, 0); // creating IPv4 TCP socket
@@ -258,19 +258,19 @@ namespace sik_2::sockets {
             return msg_sock;
         }
 
-        ~socket_TCP_in() {
+        ~socket_TCP_server() {
             close(msg_sock);
             close(sock);
         }
     };
 
-    class socket_TCP_out : public socket_ {
+    class socket_TCP_client : public socket_ {
 
     private:
         // int32_t port;
 
     public:
-        socket_TCP_out(int32_t timeout, std::string addr, int32_t port) : socket_{timeout} {
+        socket_TCP_client(int32_t timeout, std::string addr, int32_t port) : socket_{timeout} {
             struct addrinfo addr_hints;
             struct addrinfo *addr_result;
 
@@ -303,7 +303,7 @@ namespace sik_2::sockets {
             freeaddrinfo(addr_result);
         }
 
-        ~socket_TCP_out() {
+        ~socket_TCP_client() {
             close(sock);
         }
     };

@@ -73,9 +73,14 @@ namespace sik_2::file_manager {
             return files.find(name) == files.end();
         }
 
-        void add_file(std::string name, uint32_t f_size) {
-            free_space -= f_size;
-            files.insert({name, f_size});
+        bool add_file(std::string name, uint32_t f_size) {
+            if (!name.empty() && name.find('/') == std::string::npos &&
+                f_size < get_free_space() && filename_nontaken(name)) {
+                free_space -= f_size;
+                files.insert({name, f_size});
+                return true;
+            }
+            return false;
         }
 
         void save_file(int sock, std::string path, uint64_t f_size) {
@@ -84,7 +89,29 @@ namespace sik_2::file_manager {
                 cmmn::receive_file(path, f_size, sock);
             }
             catch (excpt::file_excpt &e) {
+                std::cout << "DUPA BLADA\n";
+                free_space += f_size;
+                // TODO czemu tu było "\n"????
+                files.erase({std::string{path, path.find_last_of('/'), path.length()}, f_size});
+            }
+        }
 
+        void remove_file(std::string path) {
+            std::cout << "djsdj :: " << std::string{path, path.find_last_of('/') + 1, path.length()} << "\n";
+            std::string fn = std::string{path, path.find_last_of('/') + 1, path.length()};
+
+            if (!filename_nontaken(fn)) {
+                std::cout << "TAKEN\n";
+
+                free_space += fs::file_size(path);
+                std::cout << __LINE__ << "\n";
+                files.erase(fn);
+                std::cout << __LINE__ << "\n";
+                if (remove(path.c_str()) != 0) {
+                    // throw ? czy co
+                    std::cout << __LINE__ << "\n";
+                    std::cout << "MEH\n";
+                }
             }
         }
 
@@ -93,17 +120,27 @@ namespace sik_2::file_manager {
             std::string tmp{};
 
             for (auto &t : files) {
-                std::cout << "tmp " << tmp << "\n";
-                std::cout << "t.first " << t.first << "\n";
-
-                tmp += t.first + cmmn::SEP;
+                if ((!sub.empty() && t.first.find(sub) != std::string::npos) || sub.empty()) {
+                    tmp += t.first + cmmn::SEP;
+                }
             }
 
             std::cout << "tmp::::::::::::: " << tmp << "\n";
             return tmp;
         }
-    };
 
+        std::string cut_nicely(std::string &str) {
+            std::string tmp{str, 0, std::min<size_t>(cmmn::MAX_UDP_PACKET_SIZE, str.length())};
+
+            size_t last = tmp.find_last_of('\n');
+            std::cout << "last " << last << "end: " << (tmp.length() - 1) << "\n";
+
+            tmp = std::string{tmp, 0, last};
+            str = std::string{str, last + 1, str.length()};
+
+            return tmp;
+        }
+    };
 };
 
 #endif //FILE_MANAGER_HPP
