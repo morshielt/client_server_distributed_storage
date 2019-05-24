@@ -26,6 +26,8 @@ namespace sckt = sik_2::sockets;
 namespace cmmn = sik_2::common;
 
 
+// TODO errno == EINTR w TCP - wtedy jeszcze raz próbować czytać
+
 // popaczeć timeouty, na ready, write'y podopisywać bo się zawiesi
 // SIGPIPE ogarnąć~
 // TODO nowe sockety dla fetcha
@@ -149,6 +151,8 @@ namespace sik_2::client {
             char buffer[cmmn::MAX_UDP_PACKET_SIZE];
             ssize_t ret{0};
 
+            // TODO nowy socket tylko dla fetcha,
+             // nie dla każdego, lol XD
             sckt::socket_UDP_MCAST udpm_sock{addr, cmd_port, timeout};
 
             // send request
@@ -310,10 +314,14 @@ namespace sik_2::client {
         void fill_files_list(std::string list, struct sockaddr sender) {
             do {
                 std::string tmp = std::string{list, 0, list.find(cmmn::SEP)};
-                std::cout << "tmp " << tmp << "\n";
+                std::cout << tmp << "\n";
+                // std::cout << "list " << list << "\n";
                 available_files.insert({tmp, cmmn::get_ip(sender)});
                 list = std::string{list, list.find(cmmn::SEP) + 1, list.length()};
             } while (list.length() > 0 && list.find(cmmn::SEP) != std::string::npos);
+
+            std::cout << list << "\n";
+            available_files.insert({list, cmmn::get_ip(sender)});
         }
 
         void do_fetch(const std::string &filename) {
@@ -333,8 +341,7 @@ namespace sik_2::client {
                     std::cout << "File " << filename << " downloaded ("
                               << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
                               << ")\n";
-                }
-                catch (excpt::file_excpt &e) {
+                } catch (excpt::file_excpt &e) {
                     std::cout << "File " << filename << " downloading failed ("
                               << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
                               << ") " << e.what() << "\n";

@@ -117,7 +117,6 @@ namespace sik_2::sockets {
     class socket_UDP : public socket_ {
 
     private:
-        struct sockaddr_in local_address{};
         struct ip_mreq ip_mreq{};
         struct sockaddr sender{};
 
@@ -143,11 +142,12 @@ namespace sik_2::sockets {
             if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (void *) &address_reuse, sizeof address_reuse) < 0)
                 throw_close(__LINE__);
 
-
+            struct sockaddr_in local_address{};
             /* podpięcie się pod lokalny adres i port */
             local_address.sin_family = AF_INET;
             local_address.sin_addr.s_addr = htonl(INADDR_ANY);
             local_address.sin_port = htons(cmd_port);
+            // TODO tu się czasem wywala w serwerze jak dłużej działa D:
             if (bind(sock, (struct sockaddr *) &local_address, sizeof local_address) < 0)
                 throw_close(__LINE__);
         }

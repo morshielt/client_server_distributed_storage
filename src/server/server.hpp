@@ -48,14 +48,15 @@ namespace sik_2::server {
         }
 
         void run() {
+            sckt::socket_UDP s{mcast_addr, cmd_port, timeout};
             while (true) {
                 std::cout << "jestem promptem~\n";
-                get_request();
+                get_request(s);
             }
         }
 
     private:
-        void get_request() {
+        void get_request(sckt::socket_UDP &s) {
             //TODO Serwer powinien podłączyć się do grupy rozgłaszania ukierunkowanego
             // pod wskazanym adresem MCAST_ADDR. Serwer powinien nasłuchiwać na porcie
             // CMD_PORT poleceń otrzymanych z sieci protokołem UDP {{także na swoim adresie
@@ -66,7 +67,7 @@ namespace sik_2::server {
             uint64_t rcv_len{};
             char buffer[cmmn::MAX_UDP_PACKET_SIZE];
 
-            sckt::socket_UDP s{mcast_addr, cmd_port, timeout};
+            // sckt::socket_UDP s{mcast_addr, cmd_port, timeout};
 
             rcv_len = recvfrom(s.get_sock(), buffer, sizeof(buffer), 0, &sender, &sendsize);
             s.set_sender(sender);
@@ -84,7 +85,7 @@ namespace sik_2::server {
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
 
                     if (cmd.get_data().empty() && cmd.get_cmd().compare(cmmn::hello_) == 0) {
-                        std::thread t{[this, &s, &cmd] { ans_discover(s, cmd); }};
+                        std::thread t{[this, &s, cmd] { ans_discover(s, cmd); }};
                         t.detach();
                     } else
                         invalid_package(sender, cmd_port, "Unknown command.");
@@ -96,7 +97,7 @@ namespace sik_2::server {
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
 
                     if (cmd.get_cmd().compare(cmmn::list_) == 0) {
-                        std::thread t{[this, &s, &cmd] { ans_search(s, cmd); }};
+                        std::thread t{[this, &s, cmd] { ans_search(s, cmd); }};
                         t.detach();
                     } else
                         invalid_package(sender, cmd_port, "Unknown command.");
@@ -107,7 +108,7 @@ namespace sik_2::server {
                     if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
                     if (cmd.get_cmd().compare(cmmn::get_) == 0 && !f_manager.filename_nontaken(cmd.get_data())) {
-                        std::thread t{[this, &s, &cmd] { ans_fetch(s, cmd); }};
+                        std::thread t{[this, &s, cmd] { ans_fetch(s, cmd); }};
                         t.detach();
                     } else
                         invalid_package(sender, cmd_port, "Unknown command.");
@@ -118,7 +119,9 @@ namespace sik_2::server {
                     cmds::cmplx_cmd c_cmd{buffer, rcv_len};
 
                     if (c_cmd.get_cmd().compare(cmmn::add_) == 0) {
-                        std::thread t{[this, &s, &c_cmd] { ans_upload(s, c_cmd); }};
+                        std::thread t{[this, &s, c_cmd] {
+                            ans_upload(s, c_cmd);
+                        }};
                         t.detach();
                     } else
                         invalid_package(sender, cmd_port, "Unknown command.");
@@ -128,7 +131,7 @@ namespace sik_2::server {
                     if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
 
-                    std::thread t{[this, &s, &cmd] { ans_remove(s, cmd); }};
+                    std::thread t{[this, &s, cmd] { ans_remove(s, cmd); }};
                     t.detach();
                     break;
                 }
@@ -171,7 +174,6 @@ namespace sik_2::server {
                           sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, &sender, sizeof(sender));
                 std::cout << "sent my_list\n";
             } while (all_files.length() > 0);
-
         }
 
         void ans_upload(sckt::socket_UDP &s, cmds::cmplx_cmd cmd) {

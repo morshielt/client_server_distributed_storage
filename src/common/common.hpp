@@ -19,7 +19,7 @@ namespace sik_2::common {
     static const int DEBUG{1};
     static const int32_t DEF_TIMEOUT{5};
     static const int32_t MAX_TIMEOUT{300};
-    static const int32_t DEF_SPACE{52428800};
+    static const int32_t DEF_SPACE{524288000};
     static const int32_t MAX_PORT{65535};
     static const int32_t TTL_VALUE{64};
     // static const int32_t MAX_UDP_PACKET_SIZE{65507};
