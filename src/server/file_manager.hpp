@@ -4,8 +4,9 @@
 #include "../common/validation.hpp"
 #include "../common/sockets.hpp"
 #include <map>
-// TODO mutex?
-// f_lock? idkkkkkkkkkkkkkkkkkkkkk
+#include <set>
+#include <mutex>
+#include <shared_mutex>
 
 namespace valid = sik_2::validation;
 namespace sckt = sik_2::sockets;
@@ -16,9 +17,8 @@ namespace sik_2::file_manager {
 
     private:
         std::map<std::string, uint64_t> files{};
-        // int64_t free_space;
-        // int64_t max_space;
-        // std::string shrd_fldr;
+        std::set<std::string> uploading{};
+        std::shared_mutex mutex_;
 
         void init() {
             fs::path path(shrd_fldr);
@@ -69,6 +69,7 @@ namespace sik_2::file_manager {
         }
 
         uint64_t get_free_space() {
+            std::shared_lock lock(mutex_);
             std::cout << "get_free_space : " << free_space << "\n";
             return (free_space > 0) ? free_space : 0;
         }
@@ -77,11 +78,17 @@ namespace sik_2::file_manager {
             return files.find(name) == files.end();
         }
 
+        bool is_being_uploaded(const std::string &name) {
+            return uploading.find(name) != uploading.end();
+        }
+
         bool add_file(std::string name, uint32_t f_size) {
+            std::unique_lock lock(mutex_);
             if (!name.empty() && name.find('/') == std::string::npos &&
-                f_size < get_free_space() && filename_nontaken(name)) {
+                f_size < get_free_space() && filename_nontaken(name) && !is_being_uploaded(name)) {
                 free_space -= f_size;
-                files.insert({name, f_size});
+                uploading.insert(name);
+                // files.insert({name, f_size});
                 return true;
             }
             return false;
@@ -92,11 +99,13 @@ namespace sik_2::file_manager {
             try {
                 tcp_sock.get_connection();
                 cmmn::receive_file(path, f_size, tcp_sock.get_sock());
+                files.insert({std::string{path, path.find_last_of('/') + 1, path.length()}, f_size});
+                uploading.erase(std::string{path, path.find_last_of('/') + 1, path.length()});
             }
             catch (excpt::file_excpt &e) {
                 free_space += f_size;
                 // TODO czemu tu było "\n"????
-                files.erase(std::string{path, path.find_last_of('/'), path.length()});
+                uploading.erase(std::string{path, path.find_last_of('/') + 1, path.length()});
 
                 if (remove(path.c_str()) != 0) {
                     // throw ? czy co
@@ -104,9 +113,11 @@ namespace sik_2::file_manager {
                     std::cout << "MEH\n";
                 }
             }
+
         }
 
         void remove_file(std::string path) {
+            std::unique_lock lock(mutex_);
             std::cout << "djsdj :: " << std::string{path, path.find_last_of('/') + 1, path.length()} << "\n";
             std::string fn = std::string{path, path.find_last_of('/') + 1, path.length()};
 
@@ -128,6 +139,8 @@ namespace sik_2::file_manager {
         // TODO nie działą puste XDDDDD
         std::string get_files(const std::string &sub) {
             std::string tmp{};
+
+            std::shared_lock lock(mutex_);
 
             for (auto &t : files) {
                 if ((!sub.empty() && t.first.find(sub) != std::string::npos) || sub.empty()) {
@@ -151,12 +164,30 @@ namespace sik_2::file_manager {
             return tmp;
         }
 
-        void send_file(sckt::socket_TCP_server &tcp_sock, std::string path) {
+        bool send_file(sckt::socket_TCP_server &tcp_sock, std::string path) {
             try {
                 tcp_sock.get_connection();
-                cmmn::send_file(path, fs::file_size(path), tcp_sock.get_sock());
-            } catch (excpt::file_excpt &e) {
+
+                std::shared_lock lock(mutex_);
+
+                if (!filename_nontaken(std::string{path, path.find_last_of('/') + 1, path.length()})) {
+
+                    FILE *fp = fopen(path.c_str(), "rb");
+                    if (!fp) {
+                        std::cout << __LINE__ << " " << __FILE__ << "\n";
+                        throw excpt::file_excpt(std::strerror(errno));
+                    }
+                    cmmn::send_file(fp, fs::file_size(path), tcp_sock.get_sock());
+                    std::cout << "ALL GOOOD\n";
+
+                    return true;
+                } else {
+                    std::cout << "\"" << std::string{path, path.find_last_of('/') + 1, path.length()} << "\"\n";
+                    return false;
+                }
+            } catch (excpt::excpt_with_msg &e) {
                 std::cout << "NO WYSYŁANIE SIĘ NIE UDAŁO\n";
+                return false;
             }
         }
 

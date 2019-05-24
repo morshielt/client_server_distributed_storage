@@ -28,7 +28,6 @@ namespace sik_2::common {
     static const size_t CMD_SIZE = 10;
     static const int32_t SOCK_TOUT{1};
 
-
     static const char SEP = '\n';
     static const int ERROR = -1;
 
@@ -158,12 +157,7 @@ namespace sik_2::common {
         printf("Recieved all.\n");
     }
 
-    void send_file(std::string path, size_t f_size, int sock) {
-        FILE *fp = fopen(path.c_str(), "rb");
-        if (!fp) {
-            std::cout << __LINE__ << " " << __FILE__ << "\n";
-            throw excpt::file_excpt(std::strerror(errno));
-        }
+    void send_file(FILE *fp, size_t f_size, int sock) {
 
         uint32_t sent;
         char buffer[BUFFER_SIZE];
@@ -192,5 +186,16 @@ namespace sik_2::common {
             throw excpt::file_excpt(std::strerror(errno));
         }
     }
+
+    void send_file(std::string path, size_t f_size, int sock) {
+        FILE *fp = fopen(path.c_str(), "rb");
+        if (!fp) {
+            std::cout << __LINE__ << " " << __FILE__ << "\n";
+            throw excpt::file_excpt(std::strerror(errno));
+        }
+
+        send_file(fp, f_size, sock);
+    }
+
 }
 #endif //COMMON_HPP

@@ -106,7 +106,7 @@ namespace sik_2::server {
                 case cmmn::Request::fetch: {
                     if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
-                    if (cmd.get_cmd().compare(cmmn::get_) == 0 && !f_manager.filename_nontaken(cmd.get_data())) {
+                    if (cmd.get_cmd().compare(cmmn::get_) == 0) {
                         std::thread t{[this, &s, cmd, sender] { ans_fetch(s, cmd, sender); }};
                         t.detach();
                     } else
@@ -199,11 +199,12 @@ namespace sik_2::server {
 
             sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
 
-            f_manager.send_file(tcp_sock, cmmn::get_path(shrd_fldr, cmd.get_data()));
+            if (!f_manager.send_file(tcp_sock, cmmn::get_path(shrd_fldr, cmd.get_data()))) {
+                invalid_package(sender, "File requested in fetch doesn't exist.");
+            }
         }
 
         void ans_remove(sckt::socket_UDP &s, cmds::simpl_cmd cmd) {
-            // TODO lock
             f_manager.remove_file(cmmn::get_path(shrd_fldr, cmd.get_data()));
         }
 

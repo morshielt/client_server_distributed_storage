@@ -224,7 +224,6 @@ namespace sik_2::client {
             std::cout << "jest po do_discover.\n";
         }
 
-        // TODO nowy thread na do_shit~
         void do_upload(const std::string &filename) {
             struct sockaddr sender{};
 
@@ -251,9 +250,7 @@ namespace sik_2::client {
                                                    ->bool {
                         // validate answers - we expect "NO_WAY" or "CAN_ADD"
                         if (ans.get_cmd().compare(cmmn::no_way_) == 0) {
-
                             return (ans.get_data().compare(filename) == 0);
-
                         } else if (ans.get_cmd().compare(cmmn::can_add_) == 0) {
                             accept = true;
 
@@ -274,7 +271,6 @@ namespace sik_2::client {
                                 }
                             }};
                             t.detach();
-
 
                             return true;
                         } else { // unknown cmd
@@ -324,7 +320,7 @@ namespace sik_2::client {
                 list = std::string{list, list.find(cmmn::SEP) + 1, list.length()};
             } while (list.length() > 0 && list.find(cmmn::SEP) != std::string::npos);
 
-            std::cout << list << "\n";
+            std::cout << list << " (" << sender_ip << ")\n";
             available_files.insert({list, cmmn::get_ip(sender)});
         }
 
@@ -353,7 +349,6 @@ namespace sik_2::client {
                     }
                 }};
                 t.detach();
-
                 return true;
             });
 
