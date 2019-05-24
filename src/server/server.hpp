@@ -70,7 +70,6 @@ namespace sik_2::server {
             // sckt::socket_UDP s{mcast_addr, cmd_port, timeout};
 
             rcv_len = recvfrom(s.get_sock(), buffer, sizeof(buffer), 0, &sender, &sendsize);
-            s.set_sender(sender);
 
             if (rcv_len < 0) {
                 // TODO EWOULDBLOCK/EAGAIN???
@@ -85,10 +84,10 @@ namespace sik_2::server {
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
 
                     if (cmd.get_data().empty() && cmd.get_cmd().compare(cmmn::hello_) == 0) {
-                        std::thread t{[this, &s, cmd] { ans_discover(s, cmd); }};
+                        std::thread t{[this, &s, cmd, sender] { ans_discover(s, cmd, sender); }};
                         t.detach();
                     } else
-                        invalid_package(sender, cmd_port, "Unknown command.");
+                        invalid_package(sender, "Unknown command.");
 
                     break;
                 }
@@ -97,10 +96,10 @@ namespace sik_2::server {
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
 
                     if (cmd.get_cmd().compare(cmmn::list_) == 0) {
-                        std::thread t{[this, &s, cmd] { ans_search(s, cmd); }};
+                        std::thread t{[this, &s, cmd, sender] { ans_search(s, cmd, sender); }};
                         t.detach();
                     } else
-                        invalid_package(sender, cmd_port, "Unknown command.");
+                        invalid_package(sender, "Unknown command.");
 
                     break;
                 }
@@ -108,10 +107,10 @@ namespace sik_2::server {
                     if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
                     // cmds::simpl_cmd cmd{buffer, rcv_len};
                     if (cmd.get_cmd().compare(cmmn::get_) == 0 && !f_manager.filename_nontaken(cmd.get_data())) {
-                        std::thread t{[this, &s, cmd] { ans_fetch(s, cmd); }};
+                        std::thread t{[this, &s, cmd, sender] { ans_fetch(s, cmd, sender); }};
                         t.detach();
                     } else
-                        invalid_package(sender, cmd_port, "Unknown command.");
+                        invalid_package(sender, "Unknown command.");
                     break;
                 }
                 case cmmn::Request::upload: {
@@ -119,12 +118,12 @@ namespace sik_2::server {
                     cmds::cmplx_cmd c_cmd{buffer, rcv_len};
 
                     if (c_cmd.get_cmd().compare(cmmn::add_) == 0) {
-                        std::thread t{[this, &s, c_cmd] {
-                            ans_upload(s, c_cmd);
+                        std::thread t{[this, &s, c_cmd, sender] {
+                            ans_upload(s, c_cmd, sender);
                         }};
                         t.detach();
                     } else
-                        invalid_package(sender, cmd_port, "Unknown command.");
+                        invalid_package(sender, "Unknown command.");
                     break;
                 }
                 case cmmn::Request::remove: {
@@ -137,28 +136,25 @@ namespace sik_2::server {
                 }
                 default: {
                     if (cmmn::DEBUG) std::cout << "UNKNOWN " << "\n";
-                    invalid_package(sender, cmd_port, "Unknown command.");
+                    invalid_package(sender, "Unknown command.");
                 }
             }
         }
 
-        void invalid_package(struct sockaddr addr, int32_t port, const std::string &msg) {
+        void invalid_package(struct sockaddr addr, const std::string &msg) {
             std::cout << "[PCKG ERROR] Skipping invalid package from " << cmmn::get_ip(addr)
-                      << ":" << port << ". " + msg + "\n";
+                      << ":" << cmd_port << ". " + msg + "\n";
         }
 
-        void ans_discover(sckt::socket_UDP &s, cmds::simpl_cmd cmd) {
+        void ans_discover(sckt::socket_UDP &s, cmds::simpl_cmd cmd, struct sockaddr sender) {
 
             cmds::cmplx_cmd x{cmmn::good_day_, cmd.get_cmd_seq(), f_manager.get_free_space(), mcast_addr.c_str()};
 
-            struct sockaddr sender = s.get_sender();
             sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, &sender, sizeof(sender));
             std::cout << "sent good_day\n";
         }
 
-        void ans_search(sckt::socket_UDP &s, cmds::simpl_cmd cmd) {
-
-            struct sockaddr sender = s.get_sender();
+        void ans_search(sckt::socket_UDP &s, cmds::simpl_cmd cmd, struct sockaddr sender) {
 
             std::string all_files = f_manager.get_files(cmd.get_data());
             std::cout << "all : \"" << all_files << "\"\n";
@@ -176,9 +172,7 @@ namespace sik_2::server {
             } while (all_files.length() > 0);
         }
 
-        void ans_upload(sckt::socket_UDP &s, cmds::cmplx_cmd cmd) {
-
-            struct sockaddr sender = s.get_sender();
+        void ans_upload(sckt::socket_UDP &s, cmds::cmplx_cmd cmd, struct sockaddr sender) {
 
             // TODO lock
             if (f_manager.add_file(cmd.get_data(), cmd.get_param())) {
@@ -189,8 +183,7 @@ namespace sik_2::server {
 
                 sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
 
-                tcp_sock.get_connection();
-                f_manager.save_file(tcp_sock.get_sock(), cmmn::get_path(shrd_fldr, cmd.get_data()), cmd.get_param());
+                f_manager.save_file(tcp_sock, cmmn::get_path(shrd_fldr, cmd.get_data()), cmd.get_param());
 
             } else {
                 cmds::simpl_cmd x{cmmn::no_way_, cmd.get_cmd_seq(), cmd.get_data()};
@@ -198,9 +191,7 @@ namespace sik_2::server {
             }
         }
 
-        void ans_fetch(sckt::socket_UDP &s, cmds::simpl_cmd cmd) {
-
-            struct sockaddr sender = s.get_sender();
+        void ans_fetch(sckt::socket_UDP &s, cmds::simpl_cmd cmd, struct sockaddr sender) {
 
             sckt::socket_TCP_server tcp_sock{timeout, cmmn::get_ip(sender)};
 
@@ -208,8 +199,7 @@ namespace sik_2::server {
 
             sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, (struct sockaddr *) &sender, sizeof(sender));
 
-            tcp_sock.get_connection();
-            f_manager.send_file(cmmn::get_path(shrd_fldr, cmd.get_data()), tcp_sock.get_sock());
+            f_manager.send_file(tcp_sock, cmmn::get_path(shrd_fldr, cmd.get_data()));
         }
 
         void ans_remove(sckt::socket_UDP &s, cmds::simpl_cmd cmd) {

@@ -118,7 +118,6 @@ namespace sik_2::sockets {
 
     private:
         struct ip_mreq ip_mreq{};
-        struct sockaddr sender{};
 
     public:
         socket_UDP(std::string mcast_addr, int32_t cmd_port, int32_t timeout) : socket_{timeout} {
@@ -150,14 +149,6 @@ namespace sik_2::sockets {
             // TODO tu się czasem wywala w serwerze jak dłużej działa D:
             if (bind(sock, (struct sockaddr *) &local_address, sizeof local_address) < 0)
                 throw_close(__LINE__);
-        }
-
-        void set_sender(struct sockaddr addr) {
-            sender = addr;
-        }
-
-        struct sockaddr get_sender() {
-            return sender;
         }
 
         ~socket_UDP() {
@@ -232,13 +223,34 @@ namespace sik_2::sockets {
             socklen_t client_address_len;
 
             client_address_len = sizeof(client_address);
-            msg_sock = accept(sock, (struct sockaddr *) &client_address, &client_address_len);
+
+
+
+            fd_set set;
+            FD_ZERO(&set);
+            FD_SET(sock, &set);
+
+            struct timeval tv{};
+            tv.tv_sec = timeout;
+            tv.tv_usec = 0;
+
+            int ret = select(sock + 1, &set, nullptr, nullptr, &tv);
+            if (ret <= 0) {
+                throw_close(__LINE__);
+            } else {
+                msg_sock = accept(sock, (struct sockaddr *) &client_address, &client_address_len);
+
+                if (msg_sock < 0) {
+                    throw_close(__LINE__);
+                }
+            }
+
+            // msg_sock = accept(sock, (struct sockaddr *) &client_address, &client_address_len);
 
             // timeout
-            struct timeval diff;
-            diff.tv_sec = timeout;
-            diff.tv_usec = 0;
-            if (setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (const char *) &diff, sizeof diff) < 0)
+            tv.tv_sec = timeout;
+            tv.tv_usec = 0;
+            if (setsockopt(msg_sock, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv, sizeof tv) < 0)
                 throw_close(__LINE__);
 
             if (msg_sock == -1)

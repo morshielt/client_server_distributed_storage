@@ -5,6 +5,7 @@
 #include <iostream>
 #include <regex>
 #include <thread>
+#include <atomic>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <set>
@@ -58,17 +59,10 @@ namespace sik_2::client {
         std::atomic<uint64_t> seq{};
 
         std::set<std::pair<uint64_t, std::string>, std::greater<>> servers{};
-        // TODO bo to będzie źle chyba jak to będą wątki a to jest globalna zmienna, to będzie jakaś masakra D:
-        // to chyba tzreba dać przez referencję DDDDDDDDDDDDDDDDDDD:
-        // struct sockaddr sender{};
-
         std::map<std::string, std::string> available_files{}; // filename -> ip
 
         reqp::request_parser req_parser;
 
-        // TODO bo to będzie źle chyba jak to będą wątki a to jest globalna zmienna, to będzie jakaś masakra D:
-        // to chyba tzreba dać przez referencję DDDDDDDDDDDDDDDDDDD:
-        // SEQ to samo!
         uint64_t get_next_seq() {
             return seq++;
         }
@@ -101,34 +95,39 @@ namespace sik_2::client {
                 switch (req_parser.next_request(param)) {
                     case cmmn::Request::discover: {
                         if (cmmn::DEBUG) std::cout << "DISCOVER" << "\n";
-                        std::thread t{[this] { do_discover(false); }};
-                        t.detach();
+                        // std::thread t{[this] { do_discover(false); }};
+                        // t.detach();
+                        do_discover(false);
                         break;
                     }
                     case cmmn::Request::search: {
                         if (cmmn::DEBUG) std::cout << "SEARCH" << "\n";
-                        std::thread t{[this, &param] { do_search(param); }};
-                        t.detach();
+                        // std::thread t{[this, &param] { do_search(param); }};
+                        // t.detach();
+                        do_search(param);
                         break;
                     }
                     case cmmn::Request::fetch: {
                         if (cmmn::DEBUG) std::cout << "FETCH" << "\n";
                         if (is_fetchable(param)) {
-                            std::thread t{[this, &param] { do_fetch(param); }};
-                            t.detach();
+                            // std::thread t{[this, &param] { do_fetch(param); }};
+                            // t.detach();
+                            do_fetch(param);
                         } else std::cout << "WRONK FETCH\n";
                         break;
                     }
                     case cmmn::Request::upload: {
                         if (cmmn::DEBUG) std::cout << "UPLOAD" << "\n";
-                        std::thread t{[this, &param] { do_upload(param); }};
-                        t.detach();
+                        // std::thread t{[this, &param] { do_upload(param); }};
+                        // t.detach();
+                        do_upload(param);
                         break;
                     }
                     case cmmn::Request::remove: {
                         if (cmmn::DEBUG) std::cout << "REMOVE" << "\n";
-                        std::thread t{[this, &param] { do_remove(param); }};
-                        t.detach();
+                        // std::thread t{[this, &param] { do_remove(param); }};
+                        // t.detach();
+                        do_remove(param);
                         break;
                     }
                     case cmmn::Request::exit: { // TODO zamyka połączenia? jak bd wątki to bd ok czy nie? xD
@@ -152,7 +151,7 @@ namespace sik_2::client {
             ssize_t ret{0};
 
             // TODO nowy socket tylko dla fetcha,
-             // nie dla każdego, lol XD
+            // nie dla każdego, lol XD
             sckt::socket_UDP_MCAST udpm_sock{addr, cmd_port, timeout};
 
             // send request
@@ -258,20 +257,24 @@ namespace sik_2::client {
                         } else if (ans.get_cmd().compare(cmmn::can_add_) == 0) {
                             accept = true;
 
-                            cmds::cmplx_cmd cst{ans.get_raw_msg(), ans.get_msg_size()};
+                            std::thread t{[this, sender, filename, file_size, ans] {
+                                cmds::cmplx_cmd cst{ans.get_raw_msg(), ans.get_msg_size()};
+                                sckt::socket_TCP_client
+                                    tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) cst.get_param()};
 
-                            sckt::socket_TCP_client tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) cst.get_param()};
+                                try {
+                                    cmmn::send_file(cmmn::get_path(out_fldr, filename), file_size, tcp_sock.get_sock());
+                                    std::cout << "File " << filename << " uploaded ("
+                                              << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
+                                              << ")\n";
+                                } catch (excpt::file_excpt &e) {
+                                    std::cout << "File " << filename << " uploading failed ("
+                                              << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
+                                              << ") " << e.what() << "\n";
+                                }
+                            }};
+                            t.detach();
 
-                            try {
-                                cmmn::send_file(cmmn::get_path(out_fldr, filename), file_size, tcp_sock.get_sock());
-                                std::cout << "File " << filename << " uploaded ("
-                                          << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
-                                          << ")\n";
-                            } catch (excpt::file_excpt &e) {
-                                std::cout << "File " << filename << " uploading failed ("
-                                          << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
-                                          << ") " << e.what() << "\n";
-                            }
 
                             return true;
                         } else { // unknown cmd
@@ -312,9 +315,10 @@ namespace sik_2::client {
         }
 
         void fill_files_list(std::string list, struct sockaddr sender) {
+            std::string sender_ip = cmmn::get_ip(sender);
             do {
                 std::string tmp = std::string{list, 0, list.find(cmmn::SEP)};
-                std::cout << tmp << "\n";
+                std::cout << tmp << " (" << sender_ip << ")\n";
                 // std::cout << "list " << list << "\n";
                 available_files.insert({tmp, cmmn::get_ip(sender)});
                 list = std::string{list, list.find(cmmn::SEP) + 1, list.length()};
@@ -326,26 +330,29 @@ namespace sik_2::client {
 
         void do_fetch(const std::string &filename) {
             struct sockaddr sender{};
+
             auto lambd = std::function([this, &sender, filename](cmds::cmplx_cmd ans)->bool {
                 if (ans.get_cmd().compare(cmmn::connect_me_) != 0) {
                     return false;
                 }
 
                 assert(available_files.find(filename)->second == cmmn::get_ip(sender));
-                // TODO pobieranie aż się nie otrzyma 0, meeeeeeeeeeeeeeeeeeeeeeeeeeeeeeehr.
 
-                sckt::socket_TCP_client tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) ans.get_param()};
+                std::thread t{[this, sender, ans, filename] {
+                    sckt::socket_TCP_client tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) ans.get_param()};
 
-                try {
-                    cmmn::receive_file(cmmn::get_path(out_fldr, filename), tcp_sock.get_sock());
-                    std::cout << "File " << filename << " downloaded ("
-                              << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
-                              << ")\n";
-                } catch (excpt::file_excpt &e) {
-                    std::cout << "File " << filename << " downloading failed ("
-                              << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
-                              << ") " << e.what() << "\n";
-                }
+                    try {
+                        cmmn::receive_file(cmmn::get_path(out_fldr, filename), tcp_sock.get_sock());
+                        std::cout << "File " << filename << " downloaded ("
+                                  << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
+                                  << ")\n";
+                    } catch (excpt::file_excpt &e) {
+                        std::cout << "File " << filename << " downloading failed ("
+                                  << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
+                                  << ") " << e.what() << "\n";
+                    }
+                }};
+                t.detach();
 
                 return true;
             });

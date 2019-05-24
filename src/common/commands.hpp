@@ -63,11 +63,11 @@ namespace sik_2::commands {
             // std::cout << ">> 4 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
         }
 
-        char *get_raw_msg() {
-            return msg.data();
+        char *get_raw_msg() const {
+            return const_cast<char *>(msg.data());
         }
 
-        size_t get_msg_size() {
+        size_t get_msg_size() const {
             return msg.length();
         }
 
@@ -119,7 +119,7 @@ namespace sik_2::commands {
         cmplx_cmd(char *whole, uint64_t size)
             : simpl_cmd(whole, size, cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {}
 
-        uint64_t get_param() {
+        uint64_t get_param() const {
             return be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t)));
         }
 

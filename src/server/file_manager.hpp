@@ -2,12 +2,15 @@
 #define FILE_MANAGER_HPP
 
 #include "../common/validation.hpp"
+#include "../common/sockets.hpp"
 #include <map>
 // TODO mutex?
 // f_lock? idkkkkkkkkkkkkkkkkkkkkk
 
 namespace valid = sik_2::validation;
+namespace sckt = sik_2::sockets;
 namespace fs =  boost::filesystem;
+
 namespace sik_2::file_manager {
     class file_manager {
 
@@ -84,13 +87,13 @@ namespace sik_2::file_manager {
             return false;
         }
 
-        void save_file(int sock, std::string path, uint64_t f_size) {
+        void save_file(sckt::socket_TCP_server &tcp_sock, std::string path, uint64_t f_size) {
 
             try {
-                cmmn::receive_file(path, f_size, sock);
+                tcp_sock.get_connection();
+                cmmn::receive_file(path, f_size, tcp_sock.get_sock());
             }
             catch (excpt::file_excpt &e) {
-                std::cout << "DUPA BLADA\n";
                 free_space += f_size;
                 // TODO czemu tu było "\n"????
                 files.erase(std::string{path, path.find_last_of('/'), path.length()});
@@ -148,9 +151,10 @@ namespace sik_2::file_manager {
             return tmp;
         }
 
-        void send_file(std::string path, int sock) {
+        void send_file(sckt::socket_TCP_server &tcp_sock, std::string path) {
             try {
-                cmmn::send_file(path, fs::file_size(path), sock);
+                tcp_sock.get_connection();
+                cmmn::send_file(path, fs::file_size(path), tcp_sock.get_sock());
             } catch (excpt::file_excpt &e) {
                 std::cout << "NO WYSYŁANIE SIĘ NIE UDAŁO\n";
             }
