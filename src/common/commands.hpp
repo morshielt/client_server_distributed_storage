@@ -9,63 +9,14 @@ namespace cmmn = sik_2::common;
 
 namespace sik_2::commands {
 
-    namespace {
-        const size_t S_OFFSET = cmmn::CMD_SIZE + sizeof(uint64_t);
-        const size_t C_OFFSET = cmmn::CMD_SIZE + 2 * sizeof(uint64_t);
-    }
-
-    // TODO struct __packed__ blablablablablablablbablalbablalb
     class simpl_cmd {
 
-    protected:
-        std::string msg;
-        std::size_t data_offset;
-        std::uint64_t size_;
-
-    protected:
-
-        simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data, uint64_t data_offset)
-            : data_offset{data_offset}, size_{data.length() + data_offset} {
-
-            // cmd
-            msg = std::string(size_, 0);
-            msg.replace(0, cmd.size(), cmd);
-
-            // cmd_seq
-            uint64_t be_cmd_seq = htobe64(cmd_seq);
-            memcpy(msg.data() + cmmn::CMD_SIZE, &be_cmd_seq, sizeof(uint64_t));
-
-            // data
-            msg.replace(data_offset, data.size(), data);
-            std::cout << ">> 1 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
-            if (cmmn::DEBUG) print_bytes();
-        }
-
-        simpl_cmd(char *whole, uint64_t size, uint64_t data_offset)
-            : data_offset{data_offset}, size_{size} {
-
-            msg = std::string{whole, size_};
-            std::cout << ">> 2 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
-            if (cmmn::DEBUG) print_bytes();
-        }
-
     public:
-
         simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data)
-            : simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + sizeof(uint64_t)) {
-
-            // std::cout << ">> 3 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
-        }
+            : simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + sizeof(uint64_t)) {}
 
         simpl_cmd(char *whole, uint64_t size)
-            : simpl_cmd(whole, size, cmmn::CMD_SIZE + sizeof(uint64_t)) {
-
-            // std::cout << ">> 4 LENGTH (get_msg_size): " << this->get_msg_size() << "\n";
-        }
-
-        char *get_raw_msg() const {
-            return const_cast<char *>(msg.data());
-        }
+            : simpl_cmd(whole, size, cmmn::CMD_SIZE + sizeof(uint64_t)) {}
 
         size_t get_msg_size() const {
             return msg.length();
@@ -83,10 +34,35 @@ namespace sik_2::commands {
             return be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE));
         }
 
-        virtual size_t get_data_offset() {
-            return S_OFFSET;
+        char *get_raw_msg() const {
+            return const_cast<char *>(msg.data());
         }
 
+    protected:
+        simpl_cmd(const std::string &cmd, uint64_t cmd_seq, const std::string &data, uint64_t data_offset)
+            : data_offset{data_offset}, size_{data.length() + data_offset} {
+
+            // cmd
+            msg = std::string(size_, 0);
+            msg.replace(0, cmd.size(), cmd);
+
+            // cmd_seq
+            uint64_t be_cmd_seq = htobe64(cmd_seq);
+            memcpy(msg.data() + cmmn::CMD_SIZE, &be_cmd_seq, sizeof(uint64_t));
+
+            // data
+            msg.replace(data_offset, data.size(), data);
+            if (cmmn::DEBUG) print_bytes();
+        }
+
+        simpl_cmd(char *whole, uint64_t size, uint64_t data_offset)
+            : data_offset{data_offset}, size_{size} {
+
+            msg = std::string{whole, size_};
+            if (cmmn::DEBUG) print_bytes();
+        }
+
+        // TODO remove .
         void print_bytes() {
             for (uint32_t j = 0; j < cmmn::CMD_SIZE; ++j) {
                 printf("%c ", (const unsigned char) msg.data()[j]);
@@ -102,6 +78,10 @@ namespace sik_2::commands {
             }
             std::cout << " |\n";
         }
+
+        std::string msg;
+        std::size_t data_offset;
+        std::uint64_t size_;
     };
 
     class cmplx_cmd : public simpl_cmd {
@@ -122,12 +102,7 @@ namespace sik_2::commands {
         uint64_t get_param() const {
             return be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t)));
         }
-
-        size_t get_data_offset() override {
-            return C_OFFSET;
-        }
     };
-
 }
 
 #endif //COMMANDS_HPP

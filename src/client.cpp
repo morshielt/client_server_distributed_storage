@@ -28,11 +28,6 @@ int main(int argc, const char *argv[]) {
         opt::store(opt::parse_command_line(argc, argv, opt_desc), vm);
         opt::notify(vm);
 
-        if (cmmn::DEBUG) std::cout << "mcast_addr " << mcast_addr << "\n";
-        if (cmmn::DEBUG) std::cout << "cmd_port " << cmd_port << "\n";
-        if (cmmn::DEBUG) std::cout << "out_fldr " << out_fldr << "\n";
-        if (cmmn::DEBUG) std::cout << "timeout " << timeout << "\n";
-
     } catch (const std::exception &e) {
         if (vm.count("help")) {
             std::cout << opt_desc << "\n";
@@ -51,16 +46,4 @@ int main(int argc, const char *argv[]) {
         std::cerr << "ERROR: " << e.what() << "\n";
         exit(1);
     }
-
-
-    // std::string str{cmmn::hello_, 10};
-    // std::cout << "|" + str << "|" << "\n";
-    //
-    // size_t n = 100;
-    // std::string msg(n, '-');
-    // std::cout << msg << "\n";
-    //
-    // std::cout << std::string(n, '-') << "\n";
-
-
 }

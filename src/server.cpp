@@ -19,6 +19,7 @@ int main(int argc, const char *argv[]) {
     int32_t cmd_port;
     std::string shdr_fldr;
     int32_t timeout;
+    int32_t synchronized;
     int64_t max_space;
 
     opt::options_description opt_desc("Options");
@@ -31,16 +32,11 @@ int main(int argc, const char *argv[]) {
             (",p", opt::value<int32_t>(&cmd_port)->required(), "cmd_port")
             (",f", opt::value<std::string>(&shdr_fldr)->required(), "shrd_fldr")
             (",b", opt::value<int64_t>(&max_space)->default_value(cmmn::DEF_SPACE), "max_space")
-            (",t", opt::value<int32_t>(&timeout)->default_value(cmmn::DEF_TIMEOUT), "timeout");
+            (",t", opt::value<int32_t>(&timeout)->default_value(cmmn::DEF_TIMEOUT), "timeout")
+            (",s", opt::value<int32_t>(&synchronized)->default_value(0), "synchronized");
 
         opt::store(opt::parse_command_line(argc, argv, opt_desc), vm);
         opt::notify(vm);
-
-        if (cmmn::DEBUG) std::cout << "mcast_addr " << mcast_addr << "\n";
-        if (cmmn::DEBUG) std::cout << "cmd_port " << cmd_port << "\n";
-        if (cmmn::DEBUG) std::cout << "shrd_fldr " << shdr_fldr << "\n";
-        if (cmmn::DEBUG) std::cout << "max_space " << max_space << "\n";
-        if (cmmn::DEBUG) std::cout << "timeout " << timeout << "\n";
 
     } catch (const std::exception &e) {
         if (vm.count("help")) {

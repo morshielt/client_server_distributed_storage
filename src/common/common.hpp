@@ -19,7 +19,7 @@ namespace sik_2::common {
     static const int DEBUG{1};
     static const int32_t DEF_TIMEOUT{5};
     static const int32_t MAX_TIMEOUT{300};
-    static const int32_t DEF_SPACE{524288000};
+    static const int32_t DEF_SPACE{52428800};
     static const int32_t MAX_PORT{65535};
     static const int32_t TTL_VALUE{64};
     // static const int32_t MAX_UDP_PACKET_SIZE{65507};
@@ -83,8 +83,8 @@ namespace sik_2::common {
     }
 
     // TODO throw czy co jak coś się nie powiedzie?
-    void receive_file(std::string path, size_t f_size, int sock) {
-        FILE *fp = fopen(path.c_str(), "w+b"); // file existed
+    void receive_file(const std::string &out_fldr, const std::string &filename, size_t f_size, int sock) {
+        FILE *fp = fopen(get_path(out_fldr, filename).c_str(), "w+b"); // file existed
         if (!fp) {
             std::cout << __LINE__ << " " << __FILE__ << "\n";
             throw excpt::file_excpt(std::strerror(errno));
@@ -118,8 +118,8 @@ namespace sik_2::common {
         printf("Recieved all.\n");
     }
 
-    void receive_file(std::string path, int sock) {
-        FILE *fp = fopen(path.c_str(), "w+b"); // file existed
+    void receive_file(const std::string &out_fldr, const std::string &filename, int sock) {
+        FILE *fp = fopen(get_path(out_fldr, filename).c_str(), "w+b"); // file existed
         if (!fp) {
             std::cout << __LINE__ << " " << __FILE__ << "\n";
             throw excpt::file_excpt(std::strerror(errno));
@@ -187,8 +187,8 @@ namespace sik_2::common {
         }
     }
 
-    void send_file(std::string path, size_t f_size, int sock) {
-        FILE *fp = fopen(path.c_str(), "rb");
+    void send_file(const std::string &out_fldr, const std::string &filename, size_t f_size, int sock) {
+        FILE *fp = fopen(get_path(out_fldr, filename).c_str(), "rb");
         if (!fp) {
             std::cout << __LINE__ << " " << __FILE__ << "\n";
             throw excpt::file_excpt(std::strerror(errno));

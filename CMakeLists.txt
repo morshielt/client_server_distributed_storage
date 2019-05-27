@@ -4,7 +4,7 @@ project(siki)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(Threads)
-find_package(Boost COMPONENTS program_options system filesystem REQUIRED)
+find_package(Boost COMPONENTS program_options system filesystem log REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 set(Boost_USE_STATIC_LIBS ON)
 
