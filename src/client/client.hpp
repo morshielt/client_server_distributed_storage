@@ -84,6 +84,9 @@ namespace sik_2::client {
                     case cmmn::Request::exit: {
                         return;
                     }
+                    case cmmn::Request::unknown: {
+                        break;
+                    }
                 }
             }
         }
@@ -167,6 +170,7 @@ namespace sik_2::client {
             std::cout << "jest po do_discover.\n";
         }
 
+        // TODO tak jak jest albo wywalić do_discover(i bez param, zawsze zapisywać do seta)~
         void do_upload(const std::string &filename) {
             struct sockaddr sender{};
 
@@ -241,7 +245,8 @@ namespace sik_2::client {
                     return false;
                 }
 
-                fill_files_list(ans.get_data(), sender);
+                if (ans.get_data().compare("\n") != 0)
+                    fill_files_list(ans.get_data(), sender);
 
                 return true;
             });
@@ -254,13 +259,13 @@ namespace sik_2::client {
 
         void fill_files_list(std::string list, struct sockaddr sender) {
             std::string sender_ip = cmmn::get_ip(sender);
-            do {
+            while (list.length() > 0 && list.find(cmmn::SEP) != std::string::npos) {
                 std::string tmp = std::string{list, 0, list.find(cmmn::SEP)};
                 std::cout << tmp << " (" << sender_ip << ")\n";
                 // std::cout << "list " << list << "\n";
                 available_files.insert({tmp, cmmn::get_ip(sender)});
                 list = std::string{list, list.find(cmmn::SEP) + 1, list.length()};
-            } while (list.length() > 0 && list.find(cmmn::SEP) != std::string::npos);
+            }
 
             std::cout << list << " (" << sender_ip << ")\n";
             available_files.insert({list, cmmn::get_ip(sender)});

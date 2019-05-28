@@ -57,15 +57,9 @@ namespace sik_2::common {
     }
 
     void recieve_bytes(char *buffer, int msg_sock, uint32_t expected) {
-        // TODO 0
-        // if (expected == 0) {
-        //     printf("recv 0 bytes, error.\n");
-        //     return false;
-        // }
-
         ssize_t bytes = recv(msg_sock, buffer, expected, MSG_WAITALL);
 
-        if (bytes < expected) {
+        if (bytes < expected && errno != EINTR) {
             std::cout << __LINE__ << " " << __FILE__ << "\n";
             throw excpt::file_excpt(std::strerror(errno));
         }
@@ -75,7 +69,7 @@ namespace sik_2::common {
         errno = 0;
         ssize_t bytes = send(msg_sock, buffer, expected, MSG_NOSIGNAL);
 
-        if (errno != 0 || bytes < expected) {
+        if ((errno != 0  || bytes < expected)  && errno != EINTR) {
             std::cout << __LINE__ << " " << __FILE__ << "\n";
             throw excpt::file_excpt(std::strerror(errno));
         }

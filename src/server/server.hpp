@@ -1,6 +1,6 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
-
+// TODO ZAMIAST THROW CERR
 #include <string>
 #include <iostream>
 #include <algorithm>
@@ -151,11 +151,12 @@ namespace sik_2::server {
         void ans_search(sckt::socket_UDP_server &s, cmds::simpl_cmd cmd, struct sockaddr sender) {
             std::string all_files = f_manager.get_files(cmd.get_data());
 
-            do {
+            while (all_files.length() > 1) {
                 std::string tmp = f_manager.cut_nicely(all_files);
+                std::cout << "tmp :: \"" << tmp << "\"\n";
                 cmds::simpl_cmd x{cmmn::my_list_, cmd.get_cmd_seq(), tmp};
                 sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, &sender, sizeof(sender));
-            } while (all_files.length() > 0);
+            }
         }
 
         void ans_upload(sckt::socket_UDP_server &s, cmds::cmplx_cmd cmd, struct sockaddr sender) {

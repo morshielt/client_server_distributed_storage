@@ -45,12 +45,12 @@ namespace sik_2::request_parser {
 
                 std::regex_match(line.c_str(), match_results, regex);
 
-                // if (cmmn::DEBUG) {
-                //     for (const auto &i : match_results) {
-                //         std::cout << "[" << i << "] ";
-                //     }
-                //     std::cout << "\n";
-                // }
+                if (cmmn::DEBUG) {
+                    for (const auto &i : match_results) {
+                        std::cout << "[" << i << "] ";
+                    }
+                    std::cout << "\n";
+                }
 
                 param = match_results[PARAM];
                 return recognise_request(match_results[REQ], match_results[PARAM]);

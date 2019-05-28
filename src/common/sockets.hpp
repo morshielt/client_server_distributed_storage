@@ -199,6 +199,7 @@ namespace sik_2::sockets {
             client_address_len = sizeof(client_address);
 
             // select used to timeout accept
+            fcntl(sock, F_SETFL, O_NONBLOCK);
             fd_set set;
             FD_ZERO(&set);
             FD_SET(sock, &set);

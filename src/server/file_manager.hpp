@@ -96,11 +96,12 @@ namespace sik_2::file_manager {
             std::string tmp{str, 0, std::min<size_t>(cmmn::MAX_UDP_PACKET_SIZE, str.length())};
 
             size_t last = tmp.find_last_of('\n');
-            std::cout << "last " << last << "end: " << (tmp.length() - 1) << "\n";
+            if (last != std::string::npos && last != 0) {
+                std::cout << "last " << last << "end: " << (tmp.length() - 1) << "\n";
 
-            tmp = std::string{tmp, 0, last};
-            str = std::string{str, last + 1, str.length()};
-
+                tmp = std::string{tmp, 0, last};
+                str = std::string{str, last + 1, str.length()};
+            }
             return tmp;
         }
 
