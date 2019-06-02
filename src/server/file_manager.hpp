@@ -12,6 +12,7 @@ namespace valid = sik_2::validation;
 namespace sckt = sik_2::sockets;
 namespace fs =  boost::filesystem;
 
+// File upload/download/remove/list handler
 namespace sik_2::file_manager {
     class file_manager {
 
@@ -30,10 +31,15 @@ namespace sik_2::file_manager {
             return (free_space > 0) ? free_space : 0;
         }
 
+        // Check whether it's possible to add new file
         bool add_file(std::string name, uint32_t f_size) {
             std::unique_lock lock(mutex_);
+            // Checks presence of '/', space availability, if filename's already taken
+            // and if file with such name isn't being uploaded right now
             if (!name.empty() && name.find('/') == std::string::npos &&
                 f_size <= free_space && filename_nontaken(name) && !is_being_uploaded(name)) {
+                // File is ok, we reserve space and signal that such filename is
+                // taken for now (is being uploaded)
                 free_space -= f_size;
                 uploading.insert(name);
                 return true;
@@ -41,47 +47,42 @@ namespace sik_2::file_manager {
             return false;
         }
 
+        // Try to download file from client
         void save_file(sckt::socket_TCP_server &tcp_sock, const std::string &fldr,
                        const std::string &filename, uint64_t f_size) {
+            std::unique_lock lock(mutex_);
             try {
+                // Establish TCP connection & recieve file
                 tcp_sock.get_connection();
                 cmmn::receive_file(fldr, filename, f_size, tcp_sock.get_sock());
+                // Successfull recieve
                 files.insert({filename, f_size});
                 uploading.erase(filename);
+
             } catch (excpt::file_excpt &e) {
+                // Unsuccessfull recieve - revert changes
                 free_space += f_size;
                 uploading.erase(filename);
-
-                if (remove(cmmn::get_path(fldr, filename).c_str()) != 0) {
-                    // TODO throw ? czy co
-                }
+                remove(cmmn::get_path(fldr, filename).c_str());
             }
 
         }
 
+        // Remove file if present
         void remove_file(std::string path) {
             std::unique_lock lock(mutex_);
-            std::cout << "djsdj :: " << std::string{path, path.find_last_of('/') + 1, path.length()} << "\n";
             std::string fn = std::string{path, path.find_last_of('/') + 1, path.length()};
 
             if (!filename_nontaken(fn)) {
-
                 free_space += fs::file_size(path);
-                std::cout << __LINE__ << "\n";
                 files.erase(fn);
-                std::cout << __LINE__ << "\n";
-                try {
-                    remove(path.c_str());
-                } catch (fs::filesystem_error &e) {
-                    throw e;
-                }
+                remove(path.c_str());
             }
         }
 
-        // TODO nie działą puste XDDDDD
+        // Put all filenames into string seperated by '\n'
         std::string get_files(const std::string &sub) {
             std::string tmp{};
-
             std::shared_lock lock(mutex_);
 
             for (auto &t : files) {
@@ -89,17 +90,15 @@ namespace sik_2::file_manager {
                     tmp += t.first + cmmn::SEP;
                 }
             }
-
-            std::cout << "tmp::::::::::::: " << tmp << "\n";
             return tmp;
         }
 
+        // Cut files list respecting MAX_UDP_PACKET_SIZE & don't cut through single filename
         std::string cut_nicely(std::string &str) {
             std::string tmp{str, 0, std::min<size_t>(cmmn::MAX_UDP_PACKET_SIZE, str.length())};
 
             size_t last = tmp.find_last_of('\n');
             if (last != std::string::npos && last != 0) {
-                std::cout << "last " << last << "end: " << (tmp.length() - 1) << "\n";
 
                 tmp = std::string{tmp, 0, last};
                 str = std::string{str, last + 1, str.length()};
@@ -107,17 +106,15 @@ namespace sik_2::file_manager {
             return tmp;
         }
 
+        // Send file contents through TCP
         bool send_file(sckt::socket_TCP_server &tcp_sock, std::string path) {
             try {
                 tcp_sock.get_connection();
-
                 std::shared_lock lock(mutex_);
 
                 if (!filename_nontaken(std::string{path, path.find_last_of('/') + 1, path.length()})) {
-
                     FILE *fp = fopen(path.c_str(), "rb");
                     if (!fp) {
-                        std::cout << __LINE__ << " " << __FILE__ << "\n";
                         throw excpt::file_excpt(std::strerror(errno));
                     }
 
@@ -127,12 +124,12 @@ namespace sik_2::file_manager {
                     return false;
                 }
             } catch (excpt::excpt_with_msg &e) {
-                std::cout << "NO WYSYŁANIE SIĘ NIE UDAŁO\n";
                 return false;
             }
         }
 
     private:
+        // List files & calculate free space
         void init() {
             fs::path path(shrd_fldr);
 
@@ -174,6 +171,6 @@ namespace sik_2::file_manager {
         std::string shrd_fldr{};
 
     };
-};
+}
 
 #endif //FILE_MANAGER_HPP

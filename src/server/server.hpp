@@ -177,7 +177,6 @@ namespace sik_2::server {
                 // Send file list in few packages if needed
                 while (all_files.length() > 1) {
                     std::string tmp = f_manager.cut_nicely(all_files);
-                    std::cout << "tmp :: \"" << tmp << "\"\n";
                     cmds::simpl_cmd x{cmmn::my_list_, cmd.get_cmd_seq(), tmp};
                     sendto(s.get_sock(), x.get_raw_msg(), x.get_msg_size(), 0, &sender, sizeof(sender));
                 }
@@ -231,6 +230,7 @@ namespace sik_2::server {
             }
         }
 
+        // Send answer to 'DEL' request
         void ans_remove(sckt::socket_UDP_server &s, cmds::simpl_cmd cmd) {
             try {
                 f_manager.remove_file(cmmn::get_path(shrd_fldr, cmd.get_data()));

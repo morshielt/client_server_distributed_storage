@@ -52,31 +52,12 @@ namespace sik_2::commands {
 
             // data
             msg.replace(data_offset, data.size(), data);
-            if (cmmn::DEBUG) print_bytes();
         }
 
         simpl_cmd(char *whole, uint64_t size, uint64_t data_offset)
             : data_offset{data_offset}, size_{size} {
 
             msg = std::string{whole, size_};
-            if (cmmn::DEBUG) print_bytes();
-        }
-
-        // TODO remove .
-        void print_bytes() {
-            for (uint32_t j = 0; j < cmmn::CMD_SIZE; ++j) {
-                printf("%c ", (const unsigned char) msg.data()[j]);
-            }
-            std::cout << " | " << be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE)) << " | ";
-
-            if (data_offset == cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {
-                std::cout << be64toh(*(uint64_t *) (msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t))) << " | ";
-            }
-
-            for (uint32_t i = data_offset; i < msg.length(); ++i) {
-                printf("%c ", msg.data()[i]);
-            }
-            std::cout << " |\n";
         }
 
         std::string msg;
@@ -91,7 +72,6 @@ namespace sik_2::commands {
             : simpl_cmd(cmd, cmd_seq, data, cmmn::CMD_SIZE + 2 * sizeof(uint64_t)) {
 
             // param
-            std::cout << param << "\n";
             uint64_t be_param = htobe64(param);
             memcpy(msg.data() + cmmn::CMD_SIZE + sizeof(uint64_t), &be_param, sizeof(uint64_t));
         }

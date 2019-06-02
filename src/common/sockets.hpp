@@ -12,8 +12,6 @@
 namespace cmmn = sik_2::common;
 namespace valid = sik_2::validation;
 
-//TODO timeouty! w serwerze też? ogarnąć!
-
 namespace sik_2::sockets {
 
     class socket_ {
@@ -29,8 +27,8 @@ namespace sik_2::sockets {
                 throw excpt::invalid_argument{"timeout = " + std::to_string(timeout)};
         }
 
+        // In case of constructor throwing
         void throw_close(int line) {
-            if (cmmn::DEBUG) std::cout << "throw_close :: " << line << "\n";
             if (sock >= 0) close(sock);
             throw excpt::socket_excpt(std::strerror(errno));
         }
@@ -81,7 +79,7 @@ namespace sik_2::sockets {
             gettimeofday(&start, nullptr);
         }
 
-        // TODO check
+        // Checks if socket should still recieve (there's still some timeout left)
         bool update_timeout() {
             struct timeval curr;
             gettimeofday(&curr, nullptr);
@@ -170,9 +168,7 @@ namespace sik_2::sockets {
                 throw_close(__LINE__);
 
             server_address.sin_family = AF_INET; // IPv4
-            server_address.sin_addr.s_addr = htonl(INADDR_ANY); // TODO ANY czy konkretny? jak any to wyrzucić addr z
-            // konstruktora
-            // server_address.sin_addr.s_addr = inet_addr(addr.c_str());
+            server_address.sin_addr.s_addr = htonl(INADDR_ANY);
             server_address.sin_port = htons(0);
 
             // bind the socket to a concrete address
@@ -188,8 +184,6 @@ namespace sik_2::sockets {
             // switch to listening (passive open)
             if (listen(sock, QUEUE_LENGTH) < 0)
                 throw_close(__LINE__);
-
-            if (cmmn::DEBUG) printf("accepting client connections on port %hu\n", ntohs(server_address.sin_port));
         }
 
         void get_connection() {
@@ -262,20 +256,17 @@ namespace sik_2::sockets {
             addr_hints.ai_protocol = IPPROTO_TCP;
 
             if (getaddrinfo(addr.c_str(), std::to_string(port).c_str(), &addr_hints, &addr_result) != 0) {
-                std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw excpt::socket_excpt(std::strerror(errno));
             }
 
             // initialize socket according to getaddrinfo results
             sock = socket(addr_result->ai_family, addr_result->ai_socktype, addr_result->ai_protocol);
             if (sock < 0) {
-                std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw_close(__LINE__);
             }
 
             // connect socket to server
             if (connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0) {
-                std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw_close(__LINE__);
             }
 

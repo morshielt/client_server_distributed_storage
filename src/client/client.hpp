@@ -26,13 +26,6 @@ namespace cmds = sik_2::commands;
 namespace sckt = sik_2::sockets;
 namespace cmmn = sik_2::common;
 
-
-// TODO wypisywanie ATOMOWE - do stronga, potem na cout~
-//  CZY CERR?
-// TODO errno == EINTR w TCP - wtedy jeszcze raz próbować czytać
-// TODO czy walidauję pakiety wszędzie i input clienta
-// popaczeć timeouty, na ready, write'y podopisywać bo się zawiesi
-// SIGPIPE ogarnąć~
 namespace sik_2::client {
 
     class client {
@@ -49,7 +42,7 @@ namespace sik_2::client {
             validate_directory(out_fldr);
         }
 
-        // main function
+        // Main function - decide which action to perform based on command line input
         void run() {
             std::string param{};
 
@@ -92,29 +85,26 @@ namespace sik_2::client {
         }
 
     private:
+        // Sending request and handling answer template function
         template<typename Send_type, typename Recv_type>
         void send_and_recv(Send_type s_cmd, const std::string &addr, uint64_t cmd_seq,
-                           std::function<bool(Recv_type ans)> &func, struct sockaddr &sender) {
+                           std::function<bool(Recv_type ans)> &answer_handler, struct sockaddr &sender) {
 
             char buffer[cmmn::MAX_UDP_PACKET_SIZE];
             ssize_t ret{0};
-            // TODO nowy socket dla każdego? to chyba overkill DDDDDD: ale czasem trzeba na jednostkowy, huh
+
             sckt::socket_UDP_client udpm_sock{addr, cmd_port, timeout};
 
             // send request
             ret = sendto(udpm_sock.get_sock(), s_cmd.get_raw_msg(), s_cmd.get_msg_size(), 0, (struct sockaddr *)
                 udpm_sock.get_remote_address(), sizeof(*udpm_sock.get_remote_address()));
 
-            // TODO czy my w ogóle chcemy ifować EWOULDBLOCK i EAGAIN?
-            // czy my chcemy przy wysyłaniu? czy tylko receivie?
             if (ret == -1 && !(errno == EWOULDBLOCK || errno == EAGAIN)) {
-                std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw excpt::socket_excpt(std::strerror(errno));
             }
 
             // wait 'timeout' seconds for answers
             udpm_sock.set_timestamp();
-
             while (udpm_sock.update_timeout()) {
 
                 socklen_t sendsize = sizeof(sender);
@@ -122,22 +112,21 @@ namespace sik_2::client {
                 ret = recvfrom(udpm_sock.get_sock(), buffer, sizeof(buffer), 0, &sender, &sendsize);
 
                 if (ret == -1) {
-                    // TODO czy my w ogóle chcemy ifować te rzeczy?
                     if (errno == EWOULDBLOCK || errno == EAGAIN) {
-                        // TODO czemu tu jest break? :OOOOOO
                         break;
                     }
-                    std::cout << __LINE__ << " " << __FILE__ << "\n";
                     throw excpt::socket_excpt(std::strerror(errno));
                 }
 
                 // check cmd & cmd_seq
                 Recv_type y{buffer, static_cast<uint64_t>(ret)};
 
-                // validate cmd_seq & lambda result
-                if (y.get_cmd_seq() != cmd_seq || !func(y)) {
-                    std::cout << "[PCKG ERROR] Skipping invalid package from "
-                              << cmmn::get_ip(sender) << ":" << cmd_port << "\n";
+                // validate cmd_seq & try to handle answer in 
+                // 'answer_handler' (function given in parameter)
+                if (y.get_cmd_seq() != cmd_seq || !answer_handler(y)) {
+                    std::string tmp = "[PCKG ERROR] Skipping invalid package from "
+                        + cmmn::get_ip(sender) + ":" + std::to_string(cmd_port) + "\n";
+                    std::cerr << tmp;
                 }
             }
         }
@@ -146,18 +135,21 @@ namespace sik_2::client {
             return seq++;
         }
 
+        // Send discover request - if 'upload', then it's a call for uploading purposes,
+        // so we only fill servers list, if 'upload' is false, it is a call from command line
         void do_discover(bool upload) {
             struct sockaddr sender{};
 
-            auto lambd = std::function([this, upload, &sender](cmds::cmplx_cmd ans)->bool {
-                // validate cmd - we expect "GOOD DAY"
+            auto answer_handler = std::function([this, upload, &sender](cmds::cmplx_cmd ans)->bool {
+
                 if (ans.get_cmd().compare(cmmn::good_day_) != 0) {
                     return false;
                 }
 
                 if (!upload) {
-                    std::cout << "Found " << cmmn::get_ip(sender) << " (" << ans.get_data() << ") with free space "
-                              << ans.get_param() << "\n";
+                    std::string tmp = "Found " + cmmn::get_ip(sender) + " (" + ans.get_data() + ") with free space "
+                        + std::to_string(ans.get_param()) + "\n";
+                    std::cout << tmp;
                 } else {
                     servers.insert({ans.get_param(), cmmn::get_ip(sender)});
                 }
@@ -166,81 +158,87 @@ namespace sik_2::client {
 
             if (upload) servers.clear();
             uint64_t curr_seq = get_next_seq();
-            send_and_recv(cmds::simpl_cmd{cmmn::hello_, curr_seq, ""}, mcast_addr, curr_seq, lambd, sender);
-            std::cout << "jest po do_discover.\n";
+            send_and_recv(cmds::simpl_cmd{cmmn::hello_, curr_seq, ""}, mcast_addr, curr_seq, answer_handler, sender);
         }
 
-        // TODO tak jak jest albo wywalić do_discover(i bez param, zawsze zapisywać do seta)~
+        // Discover available servers & try to upload file
         void do_upload(const std::string &filename) {
             struct sockaddr sender{};
 
             if (!fs::exists(cmmn::get_path(out_fldr, filename))) {
-                std::cerr << "File " << filename << " does not exist\n";
+
+                std::string tmp = "File " + filename + " does not exist\n";
+                std::cout << tmp;
                 return;
             }
 
             do_discover(true);
 
             uint64_t file_size = fs::file_size(cmmn::get_path(out_fldr, filename));
-
-            if (file_size > servers.begin()->first) {
-                std::cerr << "File " << filename << " too big\n";
-                return;
-            }
-
             bool accept = false;
 
             if (!servers.empty()) {
                 for (auto &ser : servers) {
 
-                    auto lambd = std::function([this, &accept, &sender, filename, file_size](cmds::simpl_cmd ans)
-                                                   ->bool {
-                        // validate answers - we expect "NO_WAY" or "CAN_ADD"
-                        if (ans.get_cmd().compare(cmmn::no_way_) == 0) {
-                            return (ans.get_data().compare(filename) == 0);
-                        } else if (ans.get_cmd().compare(cmmn::can_add_) == 0) {
-                            accept = true;
+                    auto answer_handler =
+                        std::function([this, &accept, &sender, filename, file_size](cmds::simpl_cmd ans)
+                                          ->bool {
 
-                            std::thread t{[this, sender, filename, file_size, ans] {
-                                cmds::cmplx_cmd cst{ans.get_raw_msg(), ans.get_msg_size()};
-                                sckt::socket_TCP_client
-                                    tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) cst.get_param()};
+                            if (ans.get_cmd().compare(cmmn::no_way_) == 0) {
+                                return (ans.get_data().compare(filename) == 0);
+                            } else if (ans.get_cmd().compare(cmmn::can_add_) == 0) {
+                                accept = true;
 
-                                try {
-                                    cmmn::send_file(out_fldr, filename, file_size, tcp_sock.get_sock());
-                                    std::cout << "File " << filename << " uploaded ("
-                                              << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
-                                              << ")\n";
-                                } catch (excpt::file_excpt &e) {
-                                    std::cout << "File " << filename << " uploading failed ("
-                                              << cmmn::get_ip(sender) << ":" << (int32_t) cst.get_param()
-                                              << ") " << e.what() << "\n";
-                                }
-                            }};
-                            t.detach();
+                                // Establish TCP connection
+                                std::thread t{[this, sender, filename, file_size, ans] {
+                                    cmds::cmplx_cmd cst{ans.get_raw_msg(), ans.get_msg_size()};
+                                    sckt::socket_TCP_client
+                                        tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) cst.get_param()};
 
-                            return true;
-                        } else { // unknown cmd
-                            return false;
-                        }
-                    });
+                                    try {
+                                        cmmn::send_file(out_fldr, filename, file_size, tcp_sock.get_sock());
+                                        std::string tmp = "File " + filename + " uploaded ("
+                                            + cmmn::get_ip(sender) + ":" + std::to_string((int32_t) cst.get_param())
+                                            + ")\n";
+                                        std::cout << tmp;
+                                    } catch (excpt::file_excpt &e) {
+                                        std::string tmp = "File " + filename + " uploading failed ("
+                                            + cmmn::get_ip(sender) + ":" + std::to_string((int32_t) cst.get_param())
+                                            + ") " + e.what() + "\n";
+                                        std::cout << tmp;
+                                    }
+                                }};
+                                t.detach();
+
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        });
 
                     // while nobody has accepted our "ADD" request, we keep trying
                     if (!accept) {
                         uint64_t curr_seq = get_next_seq();
                         send_and_recv(cmds::cmplx_cmd{cmmn::add_, curr_seq, file_size, filename},
-                                      ser.second, curr_seq, lambd, sender);
+                                      ser.second, curr_seq, answer_handler, sender);
                     } else {
                         break;
                     }
                 }
             }
-            std::cout << "jest po do_upload.\n";
+
+            // Nobody accepted our request
+            if (!accept) {
+                std::string tmp = "File " + filename + " too big\n";
+                std::cout << tmp;
+                return;
+            }
         }
 
+        // Search filenames containing substring on all servers
         void do_search(const std::string &sub) {
             struct sockaddr sender{};
-            auto lambd = std::function([this, &sender](cmds::simpl_cmd ans)->bool {
+            auto answer_handler = std::function([this, &sender](cmds::simpl_cmd ans)->bool {
                 if (ans.get_cmd().compare(cmmn::my_list_) != 0) {
                     return false;
                 }
@@ -253,83 +251,80 @@ namespace sik_2::client {
 
             available_files.clear();
             uint64_t curr_seq = get_next_seq();
-            send_and_recv(cmds::simpl_cmd{cmmn::list_, curr_seq, sub}, mcast_addr, curr_seq, lambd, sender);
-            std::cout << "jest po do_search.\n";
+            send_and_recv(cmds::simpl_cmd{cmmn::list_, curr_seq, sub}, mcast_addr, curr_seq, answer_handler, sender);
         }
 
+        // Save list of searched files for next fetch requests
         void fill_files_list(std::string list, struct sockaddr sender) {
             std::string sender_ip = cmmn::get_ip(sender);
             while (list.length() > 0 && list.find(cmmn::SEP) != std::string::npos) {
+
                 std::string tmp = std::string{list, 0, list.find(cmmn::SEP)};
-                std::cout << tmp << " (" << sender_ip << ")\n";
-                // std::cout << "list " << list << "\n";
+                std::string tmp_cout = tmp + " (" + sender_ip + ")\n";
+                std::cout << tmp_cout;
                 available_files.insert({tmp, cmmn::get_ip(sender)});
                 list = std::string{list, list.find(cmmn::SEP) + 1, list.length()};
             }
 
-            std::cout << list << " (" << sender_ip << ")\n";
             available_files.insert({list, cmmn::get_ip(sender)});
         }
 
+        // Fetch file (if it's name was present in last search result)
         void do_fetch(const std::string &filename) {
             struct sockaddr sender{};
 
-            auto lambd = std::function([this, &sender, filename](cmds::cmplx_cmd ans)->bool {
+            auto answer_handler = std::function([this, &sender, filename](cmds::cmplx_cmd ans)->bool {
                 if (ans.get_cmd().compare(cmmn::connect_me_) != 0) {
                     return false;
                 }
 
-                assert(available_files.find(filename)->second == cmmn::get_ip(sender));
-
+                // Establish TCP conection
                 std::thread t{[this, sender, ans, filename] {
                     sckt::socket_TCP_client tcp_sock{timeout, cmmn::get_ip(sender), (int32_t) ans.get_param()};
 
                     try {
                         cmmn::receive_file(out_fldr, filename, tcp_sock.get_sock());
-                        std::cout << "File " << filename << " downloaded ("
-                                  << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
-                                  << ")\n";
+                        std::string tmp = "File " + filename + " downloaded ("
+                            + cmmn::get_ip(sender) + ":" + std::to_string(ans.get_param()) + ")\n";
+                        std::cout << tmp;
                     } catch (excpt::file_excpt &e) {
-                        std::cout << "File " << filename << " downloading failed ("
-                                  << cmmn::get_ip(sender) << ":" << (int32_t) ans.get_param()
-                                  << ") " << e.what() << "\n";
+                        std::string tmp = "File " + filename + " downloading failed ("
+                            + cmmn::get_ip(sender) + ":" + std::to_string(ans.get_param()) + ") " + e.what() + "\n";
+                        std::cout << tmp;
+
                     }
                 }};
                 t.detach();
                 return true;
             });
 
-
-            std::cout << "available_files.find(filename)->second " << available_files.find(filename)->second << "\n";
             uint64_t curr_seq = get_next_seq();
             send_and_recv(cmds::simpl_cmd{cmmn::get_, curr_seq, filename},
-                          available_files.find(filename)->second, curr_seq, lambd, sender);
-            std::cout << "jest po do_fetch.\n";
+                          available_files.find(filename)->second, curr_seq, answer_handler, sender);
         }
 
         bool is_fetchable(const std::string &name) {
             return available_files.find(name) != available_files.end();
         }
 
+        // Send remove request by multicast
         void do_remove(const std::string &filename) {
 
             sckt::socket_UDP_client udpm_sock{mcast_addr, cmd_port, timeout};
             uint64_t curr_seq = get_next_seq();
             cmds::simpl_cmd s_cmd{cmmn::del_, curr_seq, filename};
-            // send request
+
             int ret = 0;
             ret = sendto(udpm_sock.get_sock(), s_cmd.get_raw_msg(), s_cmd.get_msg_size(), 0, (struct sockaddr *)
                 udpm_sock.get_remote_address(), sizeof(*udpm_sock.get_remote_address()));
 
-            // TODO czy my w ogóle chcemy ifować EWOULDBLOCK i EAGAIN?
-            // chcemy, ale czy przy sendzie chcemy?
             if (ret == -1 && !(errno == EWOULDBLOCK || errno == EAGAIN)) {
-                std::cout << __LINE__ << " " << __FILE__ << "\n";
                 throw excpt::socket_excpt(std::strerror(errno));
             }
-            std::cout << "jest po do_remove.\n";
         }
 
+        // Check if directory given in program arguments is able to be opened
+        // and we have sufficient permissions
         bool validate_directory(std::string path) {
             try {
                 fs::directory_iterator i(path);
