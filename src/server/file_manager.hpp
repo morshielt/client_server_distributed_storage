@@ -70,8 +70,10 @@ namespace sik_2::file_manager {
                 std::cout << __LINE__ << "\n";
                 files.erase(fn);
                 std::cout << __LINE__ << "\n";
-                if (remove(path.c_str()) != 0) {
-                    // TODO throw ? czy co
+                try {
+                    remove(path.c_str());
+                } catch (fs::filesystem_error &e) {
+                    throw e;
                 }
             }
         }

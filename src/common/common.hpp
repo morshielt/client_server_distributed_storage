@@ -27,6 +27,7 @@ namespace sik_2::common {
     static const int32_t BUFFER_SIZE{512 * 1024}; // TODO -S_OFFSET lub  -C_OFFSET, ughr~
     static const size_t CMD_SIZE = 10;
     static const int32_t SOCK_TOUT{1};
+    static const int32_t SIMPL_CMD_SIZE{18};
 
     static const char SEP = '\n';
     static const int ERROR = -1;
@@ -69,7 +70,7 @@ namespace sik_2::common {
         errno = 0;
         ssize_t bytes = send(msg_sock, buffer, expected, MSG_NOSIGNAL);
 
-        if ((errno != 0  || bytes < expected)  && errno != EINTR) {
+        if ((errno != 0 || bytes < expected) && errno != EINTR) {
             std::cout << __LINE__ << " " << __FILE__ << "\n";
             throw excpt::file_excpt(std::strerror(errno));
         }

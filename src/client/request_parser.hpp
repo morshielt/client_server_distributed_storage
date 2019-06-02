@@ -11,12 +11,12 @@ namespace sik_2::request_parser {
 
     // regexes
     namespace {
-        const std::string DISCOVER{"[Dd][Ii][Ss][Cc][Oo][Vv][Ee][Rr]|d"};
-        const std::string SEARCH{"[Ss][Ee][Aa][Rr][Cc][Hh]|s"};
-        const std::string FETCH{"[Ff][Ee][Tt][Cc][Hh]|f"};
-        const std::string UPLOAD{"[Uu][Pp][Ll][Oo][Aa][Dd]|u"};
-        const std::string REMOVE{"[Rr][Ee][Mm][Oo][Vv][Ee]|r"};
-        const std::string EXIT{"[Ee][Xx][Ii][Tt]|e"};
+        const std::string DISCOVER{"[Dd][Ii][Ss][Cc][Oo][Vv][Ee][Rr]"};
+        const std::string SEARCH{"[Ss][Ee][Aa][Rr][Cc][Hh]"};
+        const std::string FETCH{"[Ff][Ee][Tt][Cc][Hh]"};
+        const std::string UPLOAD{"[Uu][Pp][Ll][Oo][Aa][Dd]"};
+        const std::string REMOVE{"[Rr][Ee][Mm][Oo][Vv][Ee]"};
+        const std::string EXIT{"[Ee][Xx][Ii][Tt]"};
 
         const std::string ANY_END{"(?:\\s*|\\s((?:\\s*(?:.*))*))\\s*$"};
         const std::string OPTIONS{DISCOVER + "|" + SEARCH + "|" + FETCH + "|" + UPLOAD + "|" + REMOVE + "|" + EXIT};
